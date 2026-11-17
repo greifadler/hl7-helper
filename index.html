@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HL7 Inspector</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --line:#e2e5ea; --line2:#eef0f3; --text:#1c2230; --muted:#677084; --faint:#a0a7b4;
+  --accent:#0d6b6b; --accent-soft:#e0f0ef; --seg:#0d6b6b; --zseg:#8646ad;
+  --sel:#ffd74a; --sel-text:#1c2230; --selfield:#fff3c4; --hover:#e5ecfb; --hit:#c9e7ff;
+  --del:#fde3e1; --del-strong:#f4a9a3; --add:#dcf3e3; --add-strong:#9edbb1; --chg-strong:#ffbf57;
+  --mono: ui-monospace, "JetBrains Mono", "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#13161b; --panel:#1a1e25; --line:#2a303a; --line2:#222730; --text:#e2e6ed; --muted:#97a0af; --faint:#5f6877;
+    --accent:#4fc0b6; --accent-soft:#17312f; --seg:#5ccfc4; --zseg:#c591e8;
+    --sel:#d9b52c; --sel-text:#111; --selfield:#3a3417; --hover:#22304a; --hit:#1c3c5a;
+    --del:#432020; --del-strong:#7c3232; --add:#1b3a26; --add-strong:#2e6b43; --chg-strong:#a8781a;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--sans)}
+button,input,select,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px;padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:650;font-size:15px;letter-spacing:.2px}
+.brand .logo{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:grid;place-items:center;font:700 11px var(--mono)}
+.tabs{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:9px;border:1px solid var(--line)}
+.tabs button{border:0;background:none;padding:5px 14px;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:550}
+.tabs button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
+.hdr-right select{padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.offline{display:flex;align-items:center;gap:6px}
+.offline i{width:7px;height:7px;border-radius:50%;background:#2fa86b;display:inline-block}
+main{padding:16px 20px 40px;max-width:1800px;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--line2)}
+.btn{border:1px solid var(--line);background:var(--panel);padding:4px 11px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.08);color:#fff}
+.btn.sm{padding:2px 8px;font-size:12px}
+.chk{display:inline-flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap}
+.sp-flex{flex:1}
+textarea.hl7in{display:block;width:100%;min-height:140px;height:150px;resize:vertical;border:0;border-radius:10px 10px 0 0;padding:10px 12px;background:transparent;font:12.5px/1.55 var(--mono);white-space:pre;overflow:auto;outline:none}
+textarea.hl7in::placeholder{color:var(--faint)}
+.lbl{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px 0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 12px}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12.5px;max-width:420px}
+.chip b{display:block;font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.chip span{font-family:var(--mono)}
+.chip small{color:var(--muted);font-family:var(--sans);margin-left:4px}
+.chip.warn{border-color:#e0a03a;background:rgba(224,160,58,.1)}
+.workspace{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:14px;align-items:start}
+@media (max-width:1100px){.workspace{grid-template-columns:1fr}}
+.viewhead{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line2)}
+.seg-toggle{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg-toggle button{border:0;background:none;padding:3px 10px;cursor:pointer;color:var(--muted);font-size:13px}
+.seg-toggle button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.msgview{padding:6px 0;font:12.5px/1.75 var(--mono);overflow-x:auto}
+.ln{display:grid;grid-template-columns:42px minmax(0,1fr);padding:0 12px 0 0}
+.ln:hover{background:var(--line2)}
+.ln .no{color:var(--faint);text-align:right;padding-right:12px;user-select:none;font-size:11px;padding-top:1px}
+.ln .tx{white-space:pre-wrap;word-break:break-all}
+.sg{font-weight:700;color:var(--seg);cursor:pointer}
+.sg.z{color:var(--zseg)}
+.sp{color:var(--faint)}
+.fnum{font-size:9px;color:var(--accent);vertical-align:super;line-height:0;margin:0 1px 0 0;opacity:.8;user-select:none}
+.lf{cursor:pointer;border-radius:3px;transition:background .08s}
+.lf:hover{background:var(--hover);outline:1px solid var(--hover)}
+.lf.em{display:inline-block;min-width:0}
+.fd.sf .lf{background:var(--selfield)}
+.lf.hit{background:var(--hit)}
+.lf.sel,.fd.sf .lf.sel{background:var(--sel);color:var(--sel-text);outline:1px solid var(--sel)}
+.lf.sel.em{min-width:7px;height:1.1em;vertical-align:-2px}
+.lf.fs,.lf.enc{color:var(--muted)}
+.more{color:var(--muted);font-style:italic;font-family:var(--sans);font-size:11px}
+.bad{color:#c0392b;text-decoration:wavy underline;text-decoration-thickness:1px}
+.empty-state{padding:40px 20px;text-align:center;color:var(--muted)}
+.empty-state b{color:var(--text)}
+/* list view */
+.listwrap{padding:0 0 6px}
+.filter{width:100%;border:1px solid var(--line);border-radius:7px;padding:5px 9px;background:var(--bg)}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{position:sticky;top:0;background:var(--panel);text-align:left;font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:6px 8px;border-bottom:1px solid var(--line)}
+table.t td{padding:4px 8px;border-bottom:1px solid var(--line2);vertical-align:top}
+table.t td.p{font-family:var(--mono);white-space:nowrap;color:var(--accent);font-weight:600}
+table.t td.v{font-family:var(--mono);word-break:break-all}
+table.t td.ty{font-family:var(--mono);color:var(--muted);font-size:11px}
+table.t tr[data-pick]{cursor:pointer}
+table.t tr[data-pick]:hover td{background:var(--hover)}
+table.t tr.cur td{background:var(--selfield)}
+table.t tr.mt td{color:var(--faint)}
+table.t tr.sub td.p{padding-left:22px;font-weight:500}
+/* inspector */
+.inspector{position:sticky;top:64px;max-height:calc(100vh - 80px);overflow:auto}
+.ib{padding:12px 14px;border-bottom:1px solid var(--line2)}
+.ib:last-child{border-bottom:0}
+.ib h4{margin:0 0 8px;font-size:11px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.ib h4 .r{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500}
+.path{display:flex;align-items:center;gap:10px}
+.path .big{font:700 24px/1.1 var(--mono);color:var(--accent);word-break:break-all}
+.path .btn{margin-left:auto}
+.alt{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--mono)}
+.crumb{margin-top:10px;font-size:13px;line-height:1.7}
+.crumb .lvl{display:flex;gap:7px;align-items:baseline}
+.crumb .lvl .n{font:600 11px var(--mono);color:var(--muted);min-width:36px}
+.crumb code{font:11px var(--mono);background:var(--line2);border-radius:4px;padding:0 5px;color:var(--muted)}
+.crumb .lvl.leaf{font-weight:600}
+.val{margin:0;font:12.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow:auto}
+.val.empty{color:var(--faint);font-style:italic;font-family:var(--sans)}
+.kv{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;font-size:12.5px;margin-top:10px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:var(--mono);word-break:break-word}
+.qrow{display:flex;gap:6px}
+.qrow input{flex:1;border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--bg);font-family:var(--mono)}
+.qres{margin-top:8px;font-size:12.5px}
+.qres div[data-pick]{display:flex;gap:10px;padding:3px 6px;border-radius:5px;cursor:pointer;font-family:var(--mono)}
+.qres div[data-pick]:hover{background:var(--hover)}
+.qres .p{color:var(--accent);font-weight:600;white-space:nowrap}
+.qres .v{word-break:break-all}
+.hint{color:var(--muted);font-size:12.5px}
+.hint code{font-family:var(--mono);background:var(--line2);padding:0 4px;border-radius:4px}
+.badge{display:inline-block;font-size:11px;font-weight:600;border-radius:5px;padding:1px 7px}
+.badge.chg{background:var(--chg-strong);color:#3d2a00}
+.badge.same{background:var(--add);color:var(--text)}
+.badge.del{background:var(--del-strong);color:#3d0000}
+.badge.add{background:var(--add-strong);color:#00290f}
+/* compare */
+.cmp-inputs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:800px){.cmp-inputs{grid-template-columns:1fr}}
+.cmpview{font:12.5px/1.7 var(--mono);padding:4px 0}
+.crow{display:grid;grid-template-columns:34px minmax(0,1fr) 34px minmax(0,1fr);border-bottom:1px solid var(--line2)}
+.crow .no{color:var(--faint);text-align:right;padding:1px 8px 0 0;user-select:none;font-size:11px}
+.crow .cell{white-space:pre-wrap;word-break:break-all;padding:2px 10px 2px 2px;min-height:1.7em}
+.crow .cell.a{border-right:1px solid var(--line)}
+.crow.onlyA .cell.a{background:var(--del)}
+.crow.onlyA .cell.b{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--line2) 6px 7px)}
+.crow.onlyB .cell.b{background:var(--add)}
+.crow.onlyB .cell.a{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--line2) 6px 7px)}
+.crow.diff .no{color:#d48a12;font-weight:700}
+.cmpview.only .crow.same{display:none}
+.lf.df{background:var(--chg-strong);color:#2b1d00}
+.lf.df.em{min-width:7px;height:1.1em;vertical-align:-2px}
+.cmphead{display:grid;grid-template-columns:34px minmax(0,1fr) 34px minmax(0,1fr);font:600 11px var(--sans);color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line)}
+.cmphead div{padding:7px 2px}
+.dlist div[data-dpick]{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--line2)}
+.dlist div[data-dpick]:hover{background:var(--hover)}
+.dlist div.cur{background:var(--selfield)}
+.dlist .p{font:600 12.5px var(--mono);color:var(--accent);white-space:nowrap}
+.dlist .nm{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlist .vv{grid-column:1/-1;font-family:var(--mono);font-size:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.dlist .va{background:var(--del);padding:0 5px;border-radius:4px;word-break:break-all}
+.dlist .vb{background:var(--add);padding:0 5px;border-radius:4px;word-break:break-all}
+.dlist .arrow{color:var(--faint)}
+.vcmp{display:grid;grid-template-columns:22px 1fr;gap:6px 8px;align-items:start}
+.vcmp .tag{font:700 11px var(--mono);color:var(--muted);padding-top:9px}
+.vcmp .val.a{border-color:var(--del-strong)}
+.vcmp .val.b{border-color:var(--add-strong)}
+.ignore-in{border:1px solid var(--line);border-radius:6px;padding:3px 8px;width:200px;background:var(--bg);font-family:var(--mono);font-size:12.5px}
+#tip{position:fixed;z-index:50;pointer-events:none;background:#1c2230;color:#eef1f6;border-radius:7px;padding:7px 10px;font-size:12px;max-width:380px;box-shadow:0 6px 20px rgba(0,0,0,.25);display:none;line-height:1.4}
+#tip .tp{font:700 13px var(--mono);color:#7fe0d6}
+#tip .tn{color:#c9cfdb}
+#tip .tv{font-family:var(--mono);color:#fff;margin-top:3px;word-break:break-all;max-height:4.2em;overflow:hidden}
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#1c2230;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;opacity:0;transition:.2s;pointer-events:none;z-index:60}
+#toast.on{opacity:1;transform:translateX(-50%)}
+.hidden{display:none!important}
+.legend{display:flex;gap:12px;font-size:12px;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">HL7</div>HL7 Inspector</div>
+  <nav class="tabs">
+    <button data-tab="analyze" class="on">Analyse</button>
+    <button data-tab="compare">Vergleich</button>
+  </nav>
+  <div class="hdr-right">
+    <label>Pfad-Notation
+      <select id="notation">
+        <option value="-">OBX-3.2</option>
+        <option value=".">OBX.3.2</option>
+        <option value="">OBX3.2</option>
+      </select>
+    </label>
+    <span class="offline" title="Alles läuft lokal im Browser – keine Daten verlassen den Rechner, nichts wird gespeichert."><i></i>offline · keine Speicherung</span>
+  </div>
+</header>
+
+<main>
+  <!-- ======================= ANALYSE ======================= -->
+  <section id="view-analyze">
+    <div class="card">
+      <textarea id="inA" class="hl7in" spellcheck="false" placeholder="HL7-Nachricht hier einfügen (Strg+V) …&#10;&#10;MSH|^~\&|SENDER|…"></textarea>
+      <div class="toolbar">
+        <button class="btn" data-sample="adt">Beispiel ADT^A01</button>
+        <button class="btn" data-sample="oru">Beispiel ORU^R01</button>
+        <button class="btn" id="clearA">Leeren</button>
+        <select id="msgSel" class="btn hidden"></select>
+        <span class="sp-flex"></span>
+        <button class="btn" id="toCompare" title="Diese Nachricht als A in den Vergleich übernehmen">→ in Vergleich (A)</button>
+        <button class="btn" id="copyJson" title="Alle befüllten Felder als JSON (Pfad → Wert) kopieren">JSON kopieren</button>
+      </div>
+    </div>
+
+    <div id="chips" class="chips"></div>
+
+    <div class="workspace">
+      <div class="card">
+        <div class="viewhead">
+          <div class="seg-toggle">
+            <button data-view="raw" class="on">Nachricht</button>
+            <button data-view="list">Feldliste</button>
+          </div>
+          <label class="chk"><input type="checkbox" id="fieldNums"> Feldnummern</label>
+          <span class="sp-flex"></span>
+          <span class="hint">Hover = Feldname · Klick = Details</span>
+        </div>
+        <div id="viewRaw" class="msgview"></div>
+        <div id="viewList" class="listwrap hidden">
+          <div style="padding:8px 12px"><input id="listFilter" class="filter" placeholder="Filtern nach Pfad, Name oder Wert … (z.B. PID, Name, 2024)"></div>
+          <div id="listBody"></div>
+        </div>
+      </div>
+
+      <aside class="card inspector">
+        <div class="ib">
+          <h4>Pfad suchen</h4>
+          <div class="qrow"><input id="query" placeholder="z.B. PID-5.1 · OBX[2]-5 · MSH-9"></div>
+          <div id="qres" class="qres"></div>
+        </div>
+        <div id="inspBody"></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ======================= VERGLEICH ======================= -->
+  <section id="view-compare" class="hidden">
+    <div class="cmp-inputs">
+      <div class="card">
+        <div class="lbl">Nachricht A</div>
+        <textarea id="cmpA" class="hl7in" spellcheck="false" placeholder="Nachricht A einfügen …"></textarea>
+      </div>
+      <div class="card">
+        <div class="lbl">Nachricht B</div>
+        <textarea id="cmpB" class="hl7in" spellcheck="false" placeholder="Nachricht B einfügen …"></textarea>
+      </div>
+    </div>
+    <div class="card" style="margin-top:10px">
+      <div class="toolbar" style="border-top:0">
+        <button class="btn" id="cmpSample">Beispiel laden</button>
+        <button class="btn" id="cmpSwap">A ⇄ B tauschen</button>
+        <button class="btn" id="cmpClear">Leeren</button>
+        <span class="sp-flex"></span>
+        <label class="chk"><input type="checkbox" id="onlyDiff"> nur Unterschiede</label>
+        <label class="chk"><input type="checkbox" id="ignoreOn"> ignorieren:</label>
+        <input id="ignoreList" class="ignore-in" title="Kommagetrennte Pfade, z.B. MSH-7, MSH-10, EVN-2">
+      </div>
+    </div>
+
+    <div id="cmpChips" class="chips"></div>
+
+    <div class="workspace">
+      <div class="card">
+        <div class="viewhead">
+          <div class="legend">
+            <span><i style="background:var(--chg-strong)"></i>geändert</span>
+            <span><i style="background:var(--del-strong)"></i>nur in A</span>
+            <span><i style="background:var(--add-strong)"></i>nur in B</span>
+          </div>
+          <span class="sp-flex"></span>
+          <span class="hint">Klick auf ein Feld zeigt beide Werte</span>
+        </div>
+        <div class="cmphead"><div></div><div>A</div><div></div><div>B</div></div>
+        <div id="cmpView" class="cmpview"></div>
+      </div>
+      <aside class="card inspector">
+        <div id="cmpInsp"></div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<div id="tip"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   HL7 v2 Definitionen (Auszug v2.5 – häufigste Segmente & Datentypen)
+   ===================================================================== */
+const SEGS = {}, DT = {}, DTNAME = {};
+function S(id, name, defs){ SEGS[id] = { n:name, f:defs.split(';') }; }
+function D(id, name, defs){ DTNAME[id] = name; if(defs) DT[id] = defs.split(';'); }
+
+S('MSH','Message Header','Field Separator|ST;Encoding Characters|ST;Sending Application|HD;Sending Facility|HD;Receiving Application|HD;Receiving Facility|HD;Date/Time of Message|TS;Security|ST;Message Type|MSG;Message Control ID|ST;Processing ID|PT;Version ID|VID;Sequence Number|NM;Continuation Pointer|ST;Accept Acknowledgment Type|ID;Application Acknowledgment Type|ID;Country Code|ID;Character Set|ID;Principal Language of Message|CE;Alternate Character Set Handling Scheme|ID;Message Profile Identifier|EI');
+S('EVN','Event Type','Event Type Code|ID;Recorded Date/Time|TS;Date/Time Planned Event|TS;Event Reason Code|IS;Operator ID|XCN;Event Occurred|TS;Event Facility|HD');
+S('PID','Patient Identification','Set ID - PID|SI;Patient ID|CX;Patient Identifier List|CX;Alternate Patient ID - PID|CX;Patient Name|XPN;Mother\'s Maiden Name|XPN;Date/Time of Birth|TS;Administrative Sex|IS;Patient Alias|XPN;Race|CE;Patient Address|XAD;County Code|IS;Phone Number - Home|XTN;Phone Number - Business|XTN;Primary Language|CE;Marital Status|CE;Religion|CE;Patient Account Number|CX;SSN Number - Patient|ST;Driver\'s License Number - Patient|DLN;Mother\'s Identifier|CX;Ethnic Group|CE;Birth Place|ST;Multiple Birth Indicator|ID;Birth Order|NM;Citizenship|CE;Veterans Military Status|CE;Nationality|CE;Patient Death Date and Time|TS;Patient Death Indicator|ID;Identity Unknown Indicator|ID;Identity Reliability Code|IS;Last Update Date/Time|TS;Last Update Facility|HD;Species Code|CE;Breed Code|CE;Strain|ST;Production Class Code|CE;Tribal Citizenship|CWE');
+S('PD1','Patient Additional Demographic','Living Dependency|IS;Living Arrangement|IS;Patient Primary Facility|XON;Patient Primary Care Provider|XCN;Student Indicator|IS;Handicap|IS;Living Will Code|IS;Organ Donor Code|IS;Separate Bill|ID;Duplicate Patient|CX;Publicity Code|CE;Protection Indicator|ID;Protection Indicator Effective Date|DT;Place of Worship|XON;Advance Directive Code|CE;Immunization Registry Status|IS;Immunization Registry Status Effective Date|DT;Publicity Code Effective Date|DT;Military Branch|IS;Military Rank/Grade|IS;Military Status|IS');
+S('NK1','Next of Kin / Associated Parties','Set ID - NK1|SI;Name|XPN;Relationship|CE;Address|XAD;Phone Number|XTN;Business Phone Number|XTN;Contact Role|CE;Start Date|DT;End Date|DT;Next of Kin / Associated Parties Job Title|ST;Job Code/Class|JCC;Employee Number|CX;Organization Name - NK1|XON;Marital Status|CE;Administrative Sex|IS;Date/Time of Birth|TS;Living Dependency|IS;Ambulatory Status|IS;Citizenship|CE;Primary Language|CE;Living Arrangement|IS;Publicity Code|CE;Protection Indicator|ID;Student Indicator|IS;Religion|CE;Mother\'s Maiden Name|XPN;Nationality|CE;Ethnic Group|CE;Contact Reason|CE;Contact Person\'s Name|XPN;Contact Person\'s Telephone Number|XTN;Contact Person\'s Address|XAD;Next of Kin/Associated Party\'s Identifiers|CX;Job Status|IS;Race|CE;Handicap|IS;Contact Person Social Security Number|ST;Next of Kin Birth Place|ST;VIP Indicator|IS');
+S('PV1','Patient Visit','Set ID - PV1|SI;Patient Class|IS;Assigned Patient Location|PL;Admission Type|IS;Preadmit Number|CX;Prior Patient Location|PL;Attending Doctor|XCN;Referring Doctor|XCN;Consulting Doctor|XCN;Hospital Service|IS;Temporary Location|PL;Preadmit Test Indicator|IS;Re-admission Indicator|IS;Admit Source|IS;Ambulatory Status|IS;VIP Indicator|IS;Admitting Doctor|XCN;Patient Type|IS;Visit Number|CX;Financial Class|FC;Charge Price Indicator|IS;Courtesy Code|IS;Credit Rating|IS;Contract Code|IS;Contract Effective Date|DT;Contract Amount|NM;Contract Period|NM;Interest Code|IS;Transfer to Bad Debt Code|IS;Transfer to Bad Debt Date|DT;Bad Debt Agency Code|IS;Bad Debt Transfer Amount|NM;Bad Debt Recovery Amount|NM;Delete Account Indicator|IS;Delete Account Date|DT;Discharge Disposition|IS;Discharged to Location|DLD;Diet Type|CE;Servicing Facility|IS;Bed Status|IS;Account Status|IS;Pending Location|PL;Prior Temporary Location|PL;Admit Date/Time|TS;Discharge Date/Time|TS;Current Patient Balance|NM;Total Charges|NM;Total Adjustments|NM;Total Payments|NM;Alternate Visit ID|CX;Visit Indicator|IS;Other Healthcare Provider|XCN');
+S('PV2','Patient Visit - Additional Information','Prior Pending Location|PL;Accommodation Code|CE;Admit Reason|CE;Transfer Reason|CE;Patient Valuables|ST;Patient Valuables Location|ST;Visit User Code|IS;Expected Admit Date/Time|TS;Expected Discharge Date/Time|TS;Estimated Length of Inpatient Stay|NM;Actual Length of Inpatient Stay|NM;Visit Description|ST;Referral Source Code|XCN;Previous Service Date|DT;Employment Illness Related Indicator|ID;Purge Status Code|IS;Purge Status Date|DT;Special Program Code|IS;Retention Indicator|ID;Expected Number of Insurance Plans|NM;Visit Publicity Code|IS;Visit Protection Indicator|ID;Clinic Organization Name|XON;Patient Status Code|IS;Visit Priority Code|IS;Previous Treatment Date|DT;Expected Discharge Disposition|IS;Signature on File Date|DT;First Similar Illness Date|DT;Patient Charge Adjustment Code|CE;Recurring Service Code|IS;Billing Media Code|ID;Expected Surgery Date and Time|TS;Military Partnership Code|ID;Military Non-Availability Code|ID;Newborn Baby Indicator|ID;Baby Detained Indicator|ID;Mode of Arrival Code|CE;Recreational Drug Use Code|CE;Admission Level of Care Code|CE;Precaution Code|CE;Patient Condition Code|CE;Living Will Code|IS;Organ Donor Code|IS;Advance Directive Code|CE;Patient Status Effective Date|DT;Expected LOA Return Date/Time|TS;Expected Pre-admission Testing Date/Time|TS;Notify Clergy Code|IS');
+S('ORC','Common Order','Order Control|ID;Placer Order Number|EI;Filler Order Number|EI;Placer Group Number|EI;Order Status|ID;Response Flag|ID;Quantity/Timing|TQ;Parent|EIP;Date/Time of Transaction|TS;Entered By|XCN;Verified By|XCN;Ordering Provider|XCN;Enterer\'s Location|PL;Call Back Phone Number|XTN;Order Effective Date/Time|TS;Order Control Code Reason|CE;Entering Organization|CE;Entering Device|CE;Action By|XCN;Advanced Beneficiary Notice Code|CE;Ordering Facility Name|XON;Ordering Facility Address|XAD;Ordering Facility Phone Number|XTN;Ordering Provider Address|XAD;Order Status Modifier|CWE;Advanced Beneficiary Notice Override Reason|CWE;Filler\'s Expected Availability Date/Time|TS;Confidentiality Code|CWE;Order Type|CWE;Enterer Authorization Mode|CNE;Parent Universal Service Identifier|CWE');
+S('OBR','Observation Request','Set ID - OBR|SI;Placer Order Number|EI;Filler Order Number|EI;Universal Service Identifier|CE;Priority - OBR|ID;Requested Date/Time|TS;Observation Date/Time|TS;Observation End Date/Time|TS;Collection Volume|CQ;Collector Identifier|XCN;Specimen Action Code|ID;Danger Code|CE;Relevant Clinical Information|ST;Specimen Received Date/Time|TS;Specimen Source|SPS;Ordering Provider|XCN;Order Callback Phone Number|XTN;Placer Field 1|ST;Placer Field 2|ST;Filler Field 1|ST;Filler Field 2|ST;Results Rpt/Status Chng - Date/Time|TS;Charge to Practice|MOC;Diagnostic Serv Sect ID|ID;Result Status|ID;Parent Result|PRL;Quantity/Timing|TQ;Result Copies To|XCN;Parent|EIP;Transportation Mode|ID;Reason for Study|CE;Principal Result Interpreter|NDL;Assistant Result Interpreter|NDL;Technician|NDL;Transcriptionist|NDL;Scheduled Date/Time|TS;Number of Sample Containers|NM;Transport Logistics of Collected Sample|CE;Collector\'s Comment|CE;Transport Arrangement Responsibility|CE;Transport Arranged|ID;Escort Required|ID;Planned Patient Transport Comment|CE;Procedure Code|CE;Procedure Code Modifier|CE;Placer Supplemental Service Information|CE;Filler Supplemental Service Information|CE;Medically Necessary Duplicate Procedure Reason|CWE;Result Handling|IS;Parent Universal Service Identifier|CWE');
+S('OBX','Observation/Result','Set ID - OBX|SI;Value Type|ID;Observation Identifier|CE;Observation Sub-ID|ST;Observation Value|varies;Units|CE;References Range|ST;Abnormal Flags|IS;Probability|NM;Nature of Abnormal Test|ID;Observation Result Status|ID;Effective Date of Reference Range|TS;User Defined Access Checks|ST;Date/Time of the Observation|TS;Producer\'s ID|CE;Responsible Observer|XCN;Observation Method|CE;Equipment Instance Identifier|EI;Date/Time of the Analysis|TS;Observation Site|CWE;Observation Instance Identifier|EI;Mood Code|CNE;Performing Organization Name|XON;Performing Organization Address|XAD;Performing Organization Medical Director|XCN');
+S('NTE','Notes and Comments','Set ID - NTE|SI;Source of Comment|ID;Comment|FT;Comment Type|CE;Entered By|XCN;Entered Date/Time|TS;Effective Start Date|TS;Expiration Date|TS');
+S('AL1','Patient Allergy Information','Set ID - AL1|SI;Allergen Type Code|CE;Allergen Code/Mnemonic/Description|CE;Allergy Severity Code|CE;Allergy Reaction Code|ST;Identification Date|DT');
+S('DG1','Diagnosis','Set ID - DG1|SI;Diagnosis Coding Method|ID;Diagnosis Code - DG1|CE;Diagnosis Description|ST;Diagnosis Date/Time|TS;Diagnosis Type|IS;Major Diagnostic Category|CE;Diagnostic Related Group|CE;DRG Approval Indicator|ID;DRG Grouper Review Code|IS;Outlier Type|CE;Outlier Days|NM;Outlier Cost|CP;Grouper Version And Type|ST;Diagnosis Priority|ID;Diagnosing Clinician|XCN;Diagnosis Classification|IS;Confidential Indicator|ID;Attestation Date/Time|TS;Diagnosis Identifier|EI;Diagnosis Action Code|ID');
+S('PR1','Procedures','Set ID - PR1|SI;Procedure Coding Method|IS;Procedure Code|CE;Procedure Description|ST;Procedure Date/Time|TS;Procedure Functional Type|IS;Procedure Minutes|NM;Anesthesiologist|XCN;Anesthesia Code|IS;Anesthesia Minutes|NM;Surgeon|XCN;Procedure Practitioner|XCN;Consent Code|CE;Procedure Priority|ID;Associated Diagnosis Code|CE;Procedure Code Modifier|CE;Procedure DRG Type|IS;Tissue Type Code|CE;Procedure Identifier|EI;Procedure Action Code|ID');
+S('IN1','Insurance','Set ID - IN1|SI;Insurance Plan ID|CE;Insurance Company ID|CX;Insurance Company Name|XON;Insurance Company Address|XAD;Insurance Co Contact Person|XPN;Insurance Co Phone Number|XTN;Group Number|ST;Group Name|XON;Insured\'s Group Emp ID|CX;Insured\'s Group Emp Name|XON;Plan Effective Date|DT;Plan Expiration Date|DT;Authorization Information|AUI;Plan Type|IS;Name Of Insured|XPN;Insured\'s Relationship To Patient|CE;Insured\'s Date Of Birth|TS;Insured\'s Address|XAD;Assignment Of Benefits|IS;Coordination Of Benefits|IS;Coord Of Ben. Priority|ST;Notice Of Admission Flag|ID;Notice Of Admission Date|DT;Report Of Eligibility Flag|ID;Report Of Eligibility Date|DT;Release Information Code|IS;Pre-Admit Cert (PAC)|ST;Verification Date/Time|TS;Verification By|XCN;Type Of Agreement Code|IS;Billing Status|IS;Lifetime Reserve Days|NM;Delay Before L.R. Day|NM;Company Plan Code|IS;Policy Number|ST;Policy Deductible|CP;Policy Limit - Amount|CP;Policy Limit - Days|NM;Room Rate - Semi-Private|CP;Room Rate - Private|CP;Insured\'s Employment Status|CE;Insured\'s Administrative Sex|IS;Insured\'s Employer\'s Address|XAD;Verification Status|ST;Prior Insurance Plan ID|IS;Coverage Type|IS;Handicap|IS;Insured\'s ID Number|CX;Signature Code|IS;Signature Code Date|DT;Insured\'s Birth Place|ST;VIP Indicator|IS');
+S('MSA','Message Acknowledgment','Acknowledgment Code|ID;Message Control ID|ST;Text Message|ST;Expected Sequence Number|NM;Delayed Acknowledgment Type|ID;Error Condition|CE');
+S('ERR','Error','Error Code and Location|ELD;Error Location|ERL;HL7 Error Code|CWE;Severity|ID;Application Error Code|CWE;Application Error Parameter|ST;Diagnostic Information|TX;User Message|TX;Inform Person Indicator|IS;Override Type|CWE;Override Reason Code|CWE;Help Desk Contact Point|XTN');
+S('MRG','Merge Patient Information','Prior Patient Identifier List|CX;Prior Alternate Patient ID|CX;Prior Patient Account Number|CX;Prior Patient ID|CX;Prior Visit Number|CX;Prior Alternate Visit ID|CX;Prior Patient Name|XPN');
+S('SPM','Specimen','Set ID - SPM|SI;Specimen ID|EIP;Specimen Parent IDs|EIP;Specimen Type|CWE;Specimen Type Modifier|CWE;Specimen Additives|CWE;Specimen Collection Method|CWE;Specimen Source Site|CWE;Specimen Source Site Modifier|CWE;Specimen Collection Site|CWE;Specimen Role|CWE;Specimen Collection Amount|CQ;Grouped Specimen Count|NM;Specimen Description|ST;Specimen Handling Code|CWE;Specimen Risk Code|CWE;Specimen Collection Date/Time|DR;Specimen Received Date/Time|TS;Specimen Expiration Date/Time|TS;Specimen Availability|ID;Specimen Reject Reason|CWE;Specimen Quality|CWE;Specimen Appropriateness|CWE;Specimen Condition|CWE;Specimen Current Quantity|CQ;Number of Specimen Containers|NM;Container Type|CWE;Container Condition|CWE;Specimen Child Role|CWE');
+S('TXA','Transcription Document Header','Set ID - TXA|SI;Document Type|IS;Document Content Presentation|ID;Activity Date/Time|TS;Primary Activity Provider Code/Name|XCN;Origination Date/Time|TS;Transcription Date/Time|TS;Edit Date/Time|TS;Originator Code/Name|XCN;Assigned Document Authenticator|XCN;Transcriptionist Code/Name|XCN;Unique Document Number|EI;Parent Document Number|EI;Placer Order Number|EI;Filler Order Number|EI;Unique Document File Name|ST;Document Completion Status|ID;Document Confidentiality Status|ID;Document Availability Status|ID;Document Storage Status|ID;Document Change Reason|ST;Authentication Person, Time Stamp|PPN;Distributed Copies|XCN');
+S('ROL','Role','Role Instance ID|EI;Action Code|ID;Role-ROL|CE;Role Person|XCN;Role Begin Date/Time|TS;Role End Date/Time|TS;Role Duration|CE;Role Action Reason|CE;Provider Type|CE;Organization Unit Type|CE;Office/Home Address/Birthplace|XAD;Phone|XTN');
+S('TQ1','Timing/Quantity','Set ID - TQ1|SI;Quantity|CQ;Repeat Pattern|RPT;Explicit Time|TM;Relative Time and Units|CQ;Service Duration|CQ;Start Date/Time|TS;End Date/Time|TS;Priority|CWE;Condition Text|TX;Text Instruction|TX;Conjunction|ID;Occurrence Duration|CQ;Total Occurrences|NM');
+S('SCH','Scheduling Activity Information','Placer Appointment ID|EI;Filler Appointment ID|EI;Occurrence Number|NM;Placer Group Number|EI;Schedule ID|CE;Event Reason|CE;Appointment Reason|CE;Appointment Type|CE;Appointment Duration|NM;Appointment Duration Units|CE;Appointment Timing Quantity|TQ;Placer Contact Person|XCN;Placer Contact Phone Number|XTN;Placer Contact Address|XAD;Placer Contact Location|PL;Filler Contact Person|XCN;Filler Contact Phone Number|XTN;Filler Contact Address|XAD;Filler Contact Location|PL;Entered By Person|XCN;Entered By Phone Number|XTN;Entered By Location|PL;Parent Placer Appointment ID|EI;Parent Filler Appointment ID|EI;Filler Status Code|CE;Placer Order Number|EI;Filler Order Number|EI');
+S('AIS','Appointment Information','Set ID - AIS|SI;Segment Action Code|ID;Universal Service Identifier|CE;Start Date/Time|TS;Start Date/Time Offset|NM;Start Date/Time Offset Units|CE;Duration|NM;Duration Units|CE;Allow Substitution Code|IS;Filler Status Code|CE;Placer Supplemental Service Information|CE;Filler Supplemental Service Information|CE');
+S('FT1','Financial Transaction','Set ID - FT1|SI;Transaction ID|ST;Transaction Batch ID|ST;Transaction Date|DR;Transaction Posting Date|TS;Transaction Type|IS;Transaction Code|CE;Transaction Description|ST;Transaction Description - Alt|ST;Transaction Quantity|NM;Transaction Amount - Extended|CP;Transaction Amount - Unit|CP;Department Code|CE;Insurance Plan ID|CE;Insurance Amount|CP;Assigned Patient Location|PL;Fee Schedule|IS;Patient Type|IS;Diagnosis Code - FT1|CE;Performed By Code|XCN;Ordered By Code|XCN;Unit Cost|CP;Filler Order Number|EI;Entered By Code|XCN;Procedure Code|CE;Procedure Code Modifier|CE');
+S('ZBE','Bewegungsdaten (IHE-D / DE, Z-Segment)','Movement ID|EI;Start Movement Date/Time|TS;End Movement Date/Time|TS;Movement Action|ID;Historical Movement Indicator|ID;Original Trigger Event Code|ID;Responsible Ward|XON');
+
+D('HD','Hierarchic Designator','Namespace ID|IS;Universal ID|ST;Universal ID Type|ID');
+D('TS','Time Stamp','Time|DTM;Degree of Precision|ID');
+D('MSG','Message Type','Message Code|ID;Trigger Event|ID;Message Structure|ID');
+D('PT','Processing Type','Processing ID|ID;Processing Mode|ID');
+D('VID','Version Identifier','Version ID|ID;Internationalization Code|CE;International Version ID|CE');
+const CE_DEF='Identifier|ST;Text|ST;Name of Coding System|ID;Alternate Identifier|ST;Alternate Text|ST;Name of Alternate Coding System|ID';
+const CWE_DEF=CE_DEF+';Coding System Version ID|ST;Alternate Coding System Version ID|ST;Original Text|ST';
+D('CE','Coded Element',CE_DEF);
+D('CF','Coded Element with Formatted Values',CE_DEF);
+D('CWE','Coded with Exceptions',CWE_DEF);
+D('CNE','Coded with No Exceptions',CWE_DEF);
+D('CX','Extended Composite ID with Check Digit','ID Number|ST;Check Digit|ST;Check Digit Scheme|ID;Assigning Authority|HD;Identifier Type Code|ID;Assigning Facility|HD;Effective Date|DT;Expiration Date|DT;Assigning Jurisdiction|CWE;Assigning Agency or Department|CWE');
+D('XPN','Extended Person Name','Family Name|FN;Given Name|ST;Second and Further Given Names or Initials|ST;Suffix|ST;Prefix|ST;Degree|IS;Name Type Code|ID;Name Representation Code|ID;Name Context|CE;Name Validity Range|DR;Name Assembly Order|ID;Effective Date|TS;Expiration Date|TS;Professional Suffix|ST');
+D('PN','Person Name','Family Name|FN;Given Name|ST;Second and Further Given Names or Initials|ST;Suffix|ST;Prefix|ST;Degree|IS');
+D('FN','Family Name','Surname|ST;Own Surname Prefix|ST;Own Surname|ST;Surname Prefix From Partner/Spouse|ST;Surname From Partner/Spouse|ST');
+D('XAD','Extended Address','Street Address|SAD;Other Designation|ST;City|ST;State or Province|ST;Zip or Postal Code|ST;Country|ID;Address Type|ID;Other Geographic Designation|ST;County/Parish Code|IS;Census Tract|IS;Address Representation Code|ID;Address Validity Range|DR;Effective Date|TS;Expiration Date|TS');
+D('AD','Address','Street Address|ST;Other Designation|ST;City|ST;State or Province|ST;Zip or Postal Code|ST;Country|ID;Address Type|ID;Other Geographic Designation|ST');
+D('SAD','Street Address','Street or Mailing Address|ST;Street Name|ST;Dwelling Number|ST');
+D('XTN','Extended Telecommunication Number','Telephone Number|ST;Telecommunication Use Code|ID;Telecommunication Equipment Type|ID;Email Address|ST;Country Code|NM;Area/City Code|NM;Local Number|NM;Extension|NM;Any Text|ST;Extension Prefix|ST;Speed Dial Code|ST;Unformatted Telephone Number|ST');
+const XCN_DEF='ID Number|ST;Family Name|FN;Given Name|ST;Second and Further Given Names or Initials|ST;Suffix|ST;Prefix|ST;Degree|IS;Source Table|IS;Assigning Authority|HD;Name Type Code|ID;Identifier Check Digit|ST;Check Digit Scheme|ID;Identifier Type Code|ID;Assigning Facility|HD;Name Representation Code|ID;Name Context|CE;Name Validity Range|DR;Name Assembly Order|ID;Effective Date|TS;Expiration Date|TS;Professional Suffix|ST;Assigning Jurisdiction|CWE;Assigning Agency or Department|CWE';
+D('XCN','Extended Composite ID Number and Name for Persons',XCN_DEF);
+D('PPN','Performing Person Time Stamp',XCN_DEF.split(';').slice(0,20).join(';')+';Date/Time Action Performed|TS');
+D('CN','Composite ID Number and Name','ID Number|ST;Family Name|ST;Given Name|ST;Second and Further Given Names or Initials|ST;Suffix|ST;Prefix|ST;Degree|IS;Source Table|IS;Assigning Authority|HD');
+D('CNN','Composite ID Number and Name Simplified','ID Number|ST;Family Name|ST;Given Name|ST;Second and Further Given Names or Initials|ST;Suffix|ST;Prefix|ST;Degree|IS;Source Table|IS;Assigning Authority - Namespace ID|IS;Assigning Authority - Universal ID|ST;Assigning Authority - Universal ID Type|ID');
+D('XON','Extended Composite Name and ID for Organizations','Organization Name|ST;Organization Name Type Code|IS;ID Number|NM;Check Digit|NM;Check Digit Scheme|ID;Assigning Authority|HD;Identifier Type Code|ID;Assigning Facility|HD;Name Representation Code|ID;Organization Identifier|ST');
+D('PL','Person Location','Point of Care|IS;Room|IS;Bed|IS;Facility|HD;Location Status|IS;Person Location Type|IS;Building|IS;Floor|IS;Location Description|ST;Comprehensive Location Identifier|EI;Assigning Authority for Location|HD');
+D('EI','Entity Identifier','Entity Identifier|ST;Namespace ID|IS;Universal ID|ST;Universal ID Type|ID');
+D('EIP','Entity Identifier Pair','Placer Assigned Identifier|EI;Filler Assigned Identifier|EI');
+D('CQ','Composite Quantity with Units','Quantity|NM;Units|CE');
+D('SN','Structured Numeric','Comparator|ST;Num1|NM;Separator/Suffix|ST;Num2|NM');
+D('FC','Financial Class','Financial Class Code|IS;Effective Date|TS');
+D('DLD','Discharge to Location and Date','Discharge Location|IS;Effective Date|TS');
+D('ED','Encapsulated Data','Source Application|HD;Type of Data|ID;Data Subtype|ID;Encoding|ID;Data|TX');
+D('RP','Reference Pointer','Pointer|ST;Application ID|HD;Type of Data|ID;Subtype|ID');
+D('DR','Date/Time Range','Range Start Date/Time|TS;Range End Date/Time|TS');
+D('TQ','Timing Quantity','Quantity|CQ;Interval|RI;Duration|ST;Start Date/Time|TS;End Date/Time|TS;Priority|ST;Condition|ST;Text|TX;Conjunction|ID;Order Sequencing|OSD;Occurrence Duration|CE;Total Occurrences|NM');
+D('RI','Repeat Interval','Repeat Pattern|IS;Explicit Time Interval|ST');
+D('SPS','Specimen Source','Specimen Source Name or Code|CWE;Additives|CWE;Specimen Collection Method|TX;Body Site|CWE;Site Modifier|CWE;Collection Method Modifier Code|CWE;Specimen Role|CWE');
+D('NDL','Name with Date and Location','Name|CNN;Start Date/Time|TS;End Date/Time|TS;Point of Care|IS;Room|IS;Bed|IS;Facility|HD;Location Status|IS;Patient Location Type|IS;Building|IS;Floor|IS');
+D('DLN','Driver\'s License Number','License Number|ST;Issuing State, Province, Country|IS;Expiration Date|DT');
+D('JCC','Job Code/Class','Job Code|IS;Job Class|IS;Job Description Text|TX');
+D('PRL','Parent Result Link','Parent Observation Identifier|CE;Parent Observation Sub-Identifier|ST;Parent Observation Value Descriptor|TX');
+D('MOC','Money and Charge Code','Monetary Amount|MO;Charge Code|CE');
+D('MO','Money','Quantity|NM;Denomination|ID');
+D('CP','Composite Price','Price|MO;Price Type|ID;From Value|NM;To Value|NM;Range Units|CE;Range Type|ID');
+D('ELD','Error Location and Description','Segment ID|ST;Segment Sequence|NM;Field Position|NM;Code Identifying Error|CE');
+D('ERL','Error Location','Segment ID|ST;Segment Sequence|NM;Field Position|NM;Field Repetition|NM;Component Number|NM;Sub-Component Number|NM');
+D('AUI','Authorization Information','Authorization Number|ST;Date|DT;Source|ST');
+[['ST','String'],['NM','Numeric'],['ID','Coded value for HL7 tables'],['IS','Coded value for user-defined tables'],['SI','Sequence ID'],['DT','Date'],['DTM','Date/Time'],['TM','Time'],['TX','Text Data'],['FT','Formatted Text'],['TN','Telephone Number'],['varies','abhängig von OBX-2'],['RPT','Repeat Pattern'],['OSD','Order Sequence Definition']].forEach(([k,v])=>DTNAME[k]=v);
+
+const TABLES = {
+  '0001':{F:'Female (weiblich)',M:'Male (männlich)',O:'Other',U:'Unknown',A:'Ambiguous',N:'Not applicable',D:'Divers',X:'unbestimmt'},
+  '0002':{A:'Separated',D:'Divorced (geschieden)',M:'Married (verheiratet)',S:'Single (ledig)',W:'Widowed (verwitwet)',C:'Common law',G:'Living together',P:'Domestic partner',U:'Unknown'},
+  '0003':{A01:'Admit/visit notification (Aufnahme)',A02:'Transfer a patient (Verlegung)',A03:'Discharge/end visit (Entlassung)',A04:'Register a patient',A05:'Pre-admit a patient',A06:'Change outpatient to inpatient',A07:'Change inpatient to outpatient',A08:'Update patient information',A11:'Cancel admit',A12:'Cancel transfer',A13:'Cancel discharge',A28:'Add person information',A29:'Delete person information',A31:'Update person information',A34:'Merge patient information - patient ID only',A40:'Merge patient - patient identifier list',A47:'Change patient identifier list',O01:'Order message',O21:'Laboratory order',O22:'Lab order acknowledgment',O33:'Lab order for multiple orders',R01:'Unsolicited transmission of an observation',R30:'Unsolicited point-of-care observation',T02:'Original document notification and content',T04:'Document status change notification',T08:'Document edit notification',S12:'Notification of new appointment booking',S14:'Notification of appointment modification',S15:'Notification of appointment cancellation',P03:'Post detail financial transaction',V04:'Unsolicited vaccination record update'},
+  '0004':{E:'Emergency',I:'Inpatient (stationär)',O:'Outpatient (ambulant)',P:'Preadmit',R:'Recurring patient',B:'Obstetrics',C:'Commercial Account',N:'Not Applicable',U:'Unknown'},
+  '0007':{A:'Accident',C:'Elective',E:'Emergency',L:'Labor and Delivery',N:'Newborn',R:'Routine',U:'Urgent'},
+  '0008':{AA:'Application Accept',AE:'Application Error',AR:'Application Reject',CA:'Commit Accept',CE:'Commit Error',CR:'Commit Reject'},
+  '0038':{A:'Some, but not all, results available',CA:'Order was canceled',CM:'Order is completed',DC:'Order was discontinued',ER:'Error, order not found',HD:'Order is on hold',IP:'In process, unspecified',RP:'Order has been replaced',SC:'In process, scheduled'},
+  '0076':{ACK:'General acknowledgment',ADT:'Admit Discharge Transfer',BAR:'Add/change billing account',DFT:'Detail financial transaction',MDM:'Medical document management',MFN:'Master files notification',OML:'Laboratory order',OMG:'General clinical order',ORL:'Lab order response',ORM:'Pharmacy/treatment order',ORR:'Order response',ORU:'Unsolicited observation (Befund)',OUL:'Unsolicited laboratory observation',QRY:'Query',RDE:'Pharmacy/treatment encoded order',RAS:'Pharmacy/treatment administration',SIU:'Schedule information unsolicited',VXU:'Unsolicited vaccination record update'},
+  '0078':{L:'Below low normal',H:'Above high normal',LL:'Below lower panic limits',HH:'Above upper panic limits','<':'Below absolute low-off instrument scale','>':'Above absolute high-off instrument scale',N:'Normal',A:'Abnormal',AA:'Very abnormal',U:'Significant change up',D:'Significant change down',B:'Better',W:'Worse',S:'Susceptible',R:'Resistant',I:'Intermediate',NEG:'Negative',POS:'Positive'},
+  '0085':{C:'Record coming over is a correction',D:'Deletes the OBX record',F:'Final results',I:'Specimen in lab; results pending',N:'Not asked',O:'Order detail description only',P:'Preliminary results',R:'Results entered – not verified',S:'Partial results',X:'Results cannot be obtained',U:'Results status change to final',W:'Post original as wrong'},
+  '0103':{P:'Production',T:'Training',D:'Debugging'},
+  '0119':{NW:'New order',OK:'Order accepted & OK',CA:'Cancel order request',CR:'Canceled as requested',DC:'Discontinue order request',DR:'Discontinued as requested',HD:'Hold order request',SC:'Status changed',SN:'Send order number',RE:'Observations to follow',XO:'Change order request',XX:'Changed as requested',RP:'Order replace request',RU:'Replaced unsolicited',NA:'Number assigned',UA:'Unable to accept order'},
+  '0123':{O:'Order received; specimen not yet received',I:'No results available; specimen received',S:'No results available; procedure scheduled',A:'Some, but not all, results available',P:'Preliminary',C:'Correction to results',R:'Results stored; not yet verified',F:'Final results',X:'No results available; order canceled',Y:'No order on record',Z:'No record of this patient'},
+  '0125':{AD:'Address',CE:'Coded Entry',CF:'Coded Element With Formatted Values',CK:'Composite ID With Check Digit',CN:'Composite ID And Name',CNE:'Coded with No Exceptions',CP:'Composite Price',CWE:'Coded with Exceptions',CX:'Extended Composite ID',DT:'Date',DTM:'Date/Time',ED:'Encapsulated Data',FT:'Formatted Text',MO:'Money',NM:'Numeric',PN:'Person Name',RP:'Reference Pointer',SN:'Structured Numeric',ST:'String Data',TM:'Time',TN:'Telephone Number',TS:'Time Stamp',TX:'Text Data',XAD:'Extended Address',XCN:'Extended Composite Name And Number For Persons',XON:'Extended Composite Name And Number For Organizations',XPN:'Extended Person Name',XTN:'Extended Telecommunications Number'},
+  '0136':{Y:'Yes',N:'No'},
+  '0155':{AL:'Always',NE:'Never',ER:'Error/reject conditions only',SU:'Successful completion only'},
+  '0201':{PRN:'Primary Residence Number',ORN:'Other Residence Number',WPN:'Work Number',VHN:'Vacation Home Number',ASN:'Answering Service Number',EMR:'Emergency Number',NET:'Network (email) address',BPN:'Beeper Number'},
+  '0203':{PI:'Patient internal identifier',MR:'Medical record number',AN:'Account number',VN:'Visit number',SS:'Social Security number',NII:'National Insurance Identifier',PT:'Patient external identifier',NPI:'National provider identifier',DL:'Driver\'s license number',PPN:'Passport number',LANR:'Lebenslange Arztnummer',BSNR:'Betriebsstättennummer'},
+  '0200':{L:'Legal Name',D:'Display Name',M:'Maiden Name',A:'Alias Name',B:'Name at Birth',C:'Adopted Name',N:'Nickname',U:'Unspecified'},
+  '0190':{H:'Home',B:'Firm/Business',M:'Mailing',O:'Office',C:'Current Or Temporary',P:'Permanent',BA:'Bad address',BR:'Residence at birth',L:'Legal Address'}
+};
+const TABLE_MAP = {
+  'MSH-9.1':'0076','MSH-9.2':'0003','MSH-11.1':'0103','MSH-15':'0155','MSH-16':'0155','EVN-1':'0003',
+  'PID-8':'0001','PID-16.1':'0002','PID-3.5':'0203','PID-2.5':'0203','PID-18.5':'0203','PID-5.7':'0200','PID-11.7':'0190','PID-13.2':'0201','PID-14.2':'0201','PID-30':'0136',
+  'NK1-15':'0001','IN1-43':'0001','PV1-2':'0004','PV1-4':'0007','PV1-19.5':'0203','MRG-1.5':'0203',
+  'MSA-1':'0008','OBX-2':'0125','OBX-8':'0078','OBX-11':'0085','OBR-25':'0123','ORC-1':'0119','ORC-5':'0038'
+};
+const HEADER = new Set(['MSH','BHS','FHS']);
+
+/* =====================================================================
+   Beispielnachrichten
+   ===================================================================== */
+const P = n => '|'.repeat(n);
+const SAMPLES = {
+  adt: [
+    'MSH|^~\\&|KIS|KLINIKUM|LAB|LABOR|20241105143012||ADT^A01^ADT_A01|MSG00001|P|2.5|||AL|NE||8859/1|DE',
+    'EVN|A01|20241105143000|||OP01^Muster^Max',
+    'PID|1||1234567^^^KLINIKUM^PI~987654321^^^GKV^SS||Mustermann^Erika^Maria^^Dr.^^L||19750412|F|||Hauptstraße 12^^Berlin^^10115^DE^H||030 1234567^PRN^PH~^NET^Internet^erika@example.de||ger^German^ISO639|M||98765432^^^KLINIKUM^AN',
+    'NK1|1|Mustermann^Hans|SPO^Ehepartner^HL70063|Hauptstraße 12^^Berlin^^10115^DE|030 7654321',
+    'PV1|1|I|STA3^Z301^B1^KLINIKUM||||1234^Schmidt^Peter^^^Dr. med.|||INN||||1|||1234^Schmidt^Peter^^^Dr. med.||5550001^^^KLINIKUM^VN'+P(25)+'20241105142500',
+    'IN1|1|AOK^AOK Nordost||AOK Nordost^^109519005',
+    'ZBE|MOV12345^KIS|20241105142500||INSERT|N'
+  ].join('\r'),
+  oru: [
+    'MSH|^~\\&|LIS|LABOR|KIS|KLINIKUM|20241105161544||ORU^R01^ORU_R01|LAB-778812|P|2.5|||AL|NE||UNICODE UTF-8|DE',
+    'PID|1||1234567^^^KLINIKUM^PI||Mustermann^Erika^^^^^L||19750412|F',
+    'PV1|1|I|STA3^Z301^B1^KLINIKUM'+P(16)+'5550001^^^KLINIKUM^VN',
+    'ORC|RE|ORD-4711^KIS|LAB-0815^LIS||CM',
+    'OBR|1|ORD-4711^KIS|LAB-0815^LIS|BB^Blutbild^L|||20241105120000|||||||20241105123000||1234^Schmidt^Peter^^^Dr. med.||||||20241105161500|||F',
+    'OBX|1|NM|718-7^Hämoglobin^LN||13.8|g/dl^g/dl^UCUM|12.0-16.0|N|||F|||20241105160000',
+    'OBX|2|NM|6690-2^Leukozyten^LN||11.2|10*3/ul^Tsd/µl^UCUM|4.0-10.0|H|||F|||20241105160000',
+    'OBX|3|NM|777-3^Thrombozyten^LN||245|10*3/ul^Tsd/µl^UCUM|150-400|N|||F|||20241105160000',
+    'OBX|4|ST|BEM^Bemerkung^L||Probe leicht hämolytisch\\.br\\Bitte Kontrolle'+P(6)+'F',
+    'NTE|1|L|Befund telefonisch übermittelt an Station 3'
+  ].join('\r')
+};
+SAMPLES.oruB = [
+  'MSH|^~\\&|LIS|LABOR|KIS|KLINIKUM|20241106081203||ORU^R01^ORU_R01|LAB-779020|P|2.5|||AL|NE||UNICODE UTF-8|DE',
+  'PID|1||1234567^^^KLINIKUM^PI||Mustermann^Erika^^^^^L||19750412|F',
+  'PV1|1|I|STA4^Z410^B2^KLINIKUM'+P(16)+'5550001^^^KLINIKUM^VN',
+  'ORC|RE|ORD-4711^KIS|LAB-0815^LIS||CM',
+  'OBR|1|ORD-4711^KIS|LAB-0815^LIS|BB^Blutbild^L|||20241105120000|||||||20241105123000||1234^Schmidt^Peter^^^Dr. med.||||||20241106081000|||C',
+  'OBX|1|NM|718-7^Hämoglobin^LN||13.8|g/dl^g/dl^UCUM|12.0-16.0|N|||F|||20241105160000',
+  'OBX|2|NM|6690-2^Leukozyten^LN||9.7|10*3/ul^Tsd/µl^UCUM|4.0-10.0|N|||C|||20241106080500',
+  'OBX|3|NM|777-3^Thrombozyten^LN||245|10*3/ul^Tsd/µl^UCUM|150-400|N|||F|||20241105160000',
+  'OBX|4|ST|BEM^Bemerkung^L||Probe leicht hämolytisch\\.br\\Bitte Kontrolle'+P(6)+'F',
+  'OBX|5|NM|1988-5^CRP^LN||4.2|mg/l^mg/l^UCUM|<5.0|N|||F|||20241106080500'
+].join('\r');
+
+/* =====================================================================
+   Hilfsfunktionen
+   ===================================================================== */
+const $ = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => Array.from(el.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const rx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const splitDef = s => { if(!s) return null; const [name,type] = s.split('|'); return {name, type}; };
+const LONG = 300;
+
+const settings = { notation:'-', fieldNums:false, hideEmpty:true, onlyDiff:false, ignoreOn:true, ignore:'MSH-7, MSH-10' };
+function loadSettings(){ try{ Object.assign(settings, JSON.parse(localStorage.getItem('hl7insp.settings')||'{}')); }catch(e){} }
+function saveSettings(){ try{ localStorage.setItem('hl7insp.settings', JSON.stringify(settings)); }catch(e){} }
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),1600); }
+function copy(text, label){
+  const done=()=>toast(label ? 'Kopiert: '+label : 'Kopiert');
+  const fallback=()=>{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); done();}catch(e){toast('Kopieren nicht möglich');} ta.remove(); };
+  if(navigator.clipboard && window.isSecureContext !== false){ navigator.clipboard.writeText(text).then(done, fallback); } else fallback();
+}
+
+/* =====================================================================
+   Parser
+   ===================================================================== */
+function splitMessages(text){
+  text = (text||'').replace(/[\x0b\x1c]/g, '');
+  const lines = text.split(/\r\n|\n|\r/).map(l => l.replace(/^\s+/, '').replace(/\s+$/, '')).filter(l => l !== '');
+  const msgs = []; let cur = [];
+  for(const l of lines){
+    if(/^MSH/.test(l) && cur.length){ msgs.push(cur); cur = []; }
+    cur.push(l);
+  }
+  if(cur.length) msgs.push(cur);
+  return msgs.map(parseMessage);
+}
+
+function parseField(raw, enc){
+  return { raw, reps: raw.split(enc.r).map(rr => ({ raw: rr, comps: rr.split(enc.c).map(cc => ({ raw: cc, subs: cc.split(enc.s) })) })) };
+}
+function single(raw){ return { raw, special:true, reps:[{ raw, comps:[{ raw, subs:[raw] }] }] }; }
+
+function parseMessage(lines){
+  const enc = { f:'|', c:'^', r:'~', e:'\\', s:'&' };
+  const hdr = lines.find(l => /^(MSH|FHS|BHS)/.test(l));
+  if(hdr && hdr.length >= 4){
+    enc.f = hdr[3];
+    const p = hdr.split(enc.f)[1] || '';
+    if(p[0]) enc.c = p[0]; if(p[1]) enc.r = p[1]; if(p[2]) enc.e = p[2]; if(p[3]) enc.s = p[3];
+  }
+  const segs = [], counts = {};
+  lines.forEach(line => {
+    const name = line.slice(0,3);
+    const valid = /^[A-Z][A-Z0-9]{2}$/.test(name) && (line.length === 3 || line[3] === enc.f);
+    if(!valid){ segs.push({ name:'???', invalid:true, line, fields:[], occ:0 }); return; }
+    counts[name] = (counts[name]||0) + 1;
+    const parts = line.split(enc.f);
+    const fields = [null];
+    if(HEADER.has(name)){
+      fields[1] = single(enc.f);
+      fields[2] = single(parts[1] || '');
+      for(let n = 2; n < parts.length; n++) fields[n+1] = parseField(parts[n], enc);
+    } else {
+      for(let n = 1; n < parts.length; n++) fields[n] = parseField(parts[n], enc);
+    }
+    segs.push({ name, fields, occ: counts[name], line });
+  });
+  segs.forEach(s => s.multi = (counts[s.name]||0) > 1);
+  return { segs, enc, counts };
+}
+
+function getVal(seg, f, r, c, s){
+  const fd = seg && seg.fields[f]; if(!fd) return '';
+  if(r == null) return fd.raw;
+  const rp = fd.reps[r-1]; if(!rp) return '';
+  if(c == null) return rp.raw;
+  const cp = rp.comps[c-1]; if(!cp) return '';
+  if(s == null) return cp.raw;
+  return cp.subs[s-1] ?? '';
+}
+
+function decodeEsc(v, enc){
+  const e = enc.e; if(!e || v.indexOf(e) < 0) return v;
+  const re = new RegExp(rx(e) + '([^' + rx(e) + ']*)' + rx(e), 'g');
+  return v.replace(re, (m, code) => {
+    switch(code){
+      case 'F': return enc.f; case 'S': return enc.c; case 'T': return enc.s; case 'R': return enc.r; case 'E': return e;
+      case '.br': return '\n'; case 'H': case 'N': return '';
+    }
+    if(/^X([0-9A-Fa-f]{2})+$/.test(code)){
+      try{ const bytes = new Uint8Array(code.slice(1).match(/../g).map(h => parseInt(h,16))); return new TextDecoder().decode(bytes); }catch(err){ return m; }
+    }
+    if(/^\.sp\d*$/.test(code)) return '\n';
+    if(/^\.(in|ti|ce|fi|nf|sk)/.test(code)) return '';
+    return m;
+  });
+}
+
+function fmtDate(v){
+  const m = /^(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?(?:\.(\d{1,4}))?([+-]\d{4})?$/.exec((v||'').trim());
+  if(!m) return null;
+  const [, Y, M, D, h, mi, s, fr, tz] = m;
+  if(M && (+M < 1 || +M > 12)) return null;
+  if(D && (+D < 1 || +D > 31)) return null;
+  if(h && +h > 23) return null;
+  let out = (D ? D + '.' : '') + (M ? M + '.' : '') + Y;
+  if(h) out += ' ' + h + ':' + (mi || '00') + (s ? ':' + s : '') + (fr ? '.' + fr : '') + ' Uhr';
+  if(tz) out += ' (UTC' + tz.slice(0,3) + ':' + tz.slice(3) + ')';
+  return out;
+}
+
+/* Feld-/Komponenten-Beschreibung */
+function describe(seg, f, c, s){
+  const sd = SEGS[seg.name];
+  const out = { segDesc: sd ? sd.n : (seg.name[0] === 'Z' ? 'Z-Segment (benutzerdefiniert)' : 'Segment ohne hinterlegte Definition') };
+  let fd = sd && sd.f[f-1] ? splitDef(sd.f[f-1]) : null;
+  if(fd && seg.name === 'OBX' && f === 5){ const vt = getVal(seg,2,1,1,1).trim(); if(vt) fd = { ...fd, type: vt }; }
+  out.field = fd;
+  if(c != null && fd && DT[fd.type]) out.comp = splitDef(DT[fd.type][c-1]);
+  if(s != null && out.comp && DT[out.comp.type]) out.sub = splitDef(DT[out.comp.type][s-1]);
+  return out;
+}
+function leafType(d, c, s){
+  let t = null;
+  if(s != null && d.sub) t = d.sub.type;
+  else if(c != null && d.comp) t = d.comp.type;
+  else if(c == null && d.field) t = d.field.type;
+  if(t && DT[t] && ((c == null) || (s == null && c != null))) { const first = splitDef(DT[t][0]); if(first) t = DT[first.type] ? splitDef(DT[first.type][0]).type : first.type; }
+  return t;
+}
+function shortName(seg, f, c, s){
+  const d = describe(seg, f, c, s);
+  const parts = [];
+  parts.push(d.field ? d.field.name : (seg.name[0]==='Z' ? 'Z-Feld' : 'Feld '+f));
+  if(c != null) parts.push(d.comp ? d.comp.name : 'Komponente '+c);
+  if(s != null) parts.push(d.sub ? d.sub.name : 'Subkomponente '+s);
+  return parts.join(' › ');
+}
+
+/* Pfad-Formatierung */
+function fmtPath(segLabel, f, r, c, s){
+  let p = segLabel + settings.notation + f;
+  if(r != null) p += '[' + r + ']';
+  if(c != null) p += '.' + c;
+  if(s != null) p += '.' + s;
+  return p;
+}
+function segLabel(seg, withOcc){ return seg.name + (withOcc && seg.multi ? '[' + seg.occ + ']' : ''); }
+
+/* Bestimmt, wie tief der Pfad für ein Blatt angezeigt wird (struktur-basiert) */
+function leafSel(segs, f, r, c, s){
+  let incS = false, incC = false, multiRep = false;
+  for(const seg of segs){
+    const fd = seg && seg.fields[f]; if(!fd) continue;
+    if(fd.reps.length > 1) multiRep = true;
+    const rp = fd.reps[r-1]; if(!rp) continue;
+    if(rp.comps.length > 1) incC = true;
+    const cp = rp.comps[c-1]; if(cp && cp.subs.length > 1) incS = true;
+  }
+  if(incS) incC = true;
+  if(c > 1) incC = true;
+  if(s > 1) { incS = true; incC = true; }
+  return { f, r, c: incC ? c : null, s: incS ? s : null, showRep: multiRep || r > 1 };
+}
+
+function tableLookup(seg, f, c, v){
+  const key = seg.name + '-' + f;
+  const t = TABLE_MAP[key + '.' + (c || 1)] || ((c == null || c === 1) ? TABLE_MAP[key] : null);
+  if(!t || !TABLES[t]) return null;
+  const hit = TABLES[t][v.trim()];
+  return hit ? { table: t, text: hit } : { table: t, text: null };
+}
+
+/* =====================================================================
+   Rendering einer Segmentzeile (gemeinsam für Analyse & Vergleich)
+   ===================================================================== */
+function segHTML(seg, si, side, enc, diff, fieldNums){
+  if(seg.invalid) return `<span class="bad" title="Keine gültige Segmentzeile">${esc(seg.line)}</span>`;
+  const hdr = HEADER.has(seg.name);
+  const sp = ch => `<span class="sp">${esc(ch)}</span>`;
+  const fnum = f => fieldNums ? `<span class="fnum">${f}</span>` : '';
+  const leaf = (f, r, c, s, v, cls) => {
+    const d = diff && diff.has(f+':'+r+':'+c+':'+s);
+    const txt = v.length > LONG ? esc(v.slice(0, LONG)) + `<span class="more">…[+${v.length - LONG} Zeichen]</span>` : esc(v);
+    return `<span class="lf${v === '' ? ' em' : ''}${d ? ' df' : ''}${cls ? ' ' + cls : ''}" data-k="${side}:${si}:${f}:${r}:${c}:${s}">${txt}</span>`;
+  };
+  let h = `<span class="sg${seg.name[0] === 'Z' ? ' z' : ''}" data-sg="${side}:${si}">${seg.name}</span>`;
+  for(let f = 1; f < seg.fields.length; f++){
+    const fd = seg.fields[f]; if(!fd) continue;
+    if(hdr && f === 1){ h += fnum(1) + `<span class="fd" data-f="${side}:${si}:1">${leaf(1,1,1,1,enc.f,'fs')}</span>`; continue; }
+    if(!(hdr && f === 2)) h += sp(enc.f);
+    h += fnum(f) + `<span class="fd" data-f="${side}:${si}:${f}">`;
+    if(fd.special) h += leaf(f,1,1,1,fd.raw,'enc');
+    else h += fd.reps.map((rp, ri) => rp.comps.map((cp, ci) => cp.subs.map((sv, xi) => leaf(f, ri+1, ci+1, xi+1, sv)).join(sp(enc.s))).join(sp(enc.c))).join(sp(enc.r));
+    h += '</span>';
+  }
+  // Diff-Markierung für Felder, die nur auf der anderen Seite existieren
+  if(diff && diff.extra){
+    for(const k of diff.extra){ h += sp(enc.f) + `<span class="lf df em" data-k="${side}:${si}:${k}"></span>`; }
+  }
+  return h;
+}
+
+/* =====================================================================
+   ANALYSE
+   ===================================================================== */
+const state = { msgs:[], msgIdx:0, msg:null, sel:null, view:'raw', cmp:null, cmpSel:null };
+
+function analyze(){
+  const text = $('#inA').value;
+  state.msgs = text.trim() ? splitMessages(text) : [];
+  if(state.msgIdx >= state.msgs.length) state.msgIdx = 0;
+  state.msg = state.msgs[state.msgIdx] || null;
+  state.sel = null;
+  const sel = $('#msgSel');
+  if(state.msgs.length > 1){
+    sel.classList.remove('hidden');
+    sel.innerHTML = state.msgs.map((m, i) => {
+      const msh = m.segs.find(s => s.name === 'MSH');
+      const t = msh ? getVal(msh,9,1,null,null) : '';
+      return `<option value="${i}"${i === state.msgIdx ? ' selected' : ''}>Nachricht ${i+1}/${state.msgs.length}: ${esc(t)}</option>`;
+    }).join('');
+  } else sel.classList.add('hidden');
+  renderAnalyze();
+}
+
+function renderAnalyze(){
+  renderChips();
+  renderRaw();
+  renderList();
+  runQuery();
+  renderInspector();
+}
+
+function chip(label, val, note, cls){
+  if(val === '' || val == null) return '';
+  return `<div class="chip${cls ? ' ' + cls : ''}"><b>${esc(label)}</b><span>${esc(val)}</span>${note ? `<small>${esc(note)}</small>` : ''}</div>`;
+}
+function summaryChips(msg){
+  let h = '';
+  const msh = msg.segs.find(s => s.name === 'MSH');
+  if(msh){
+    const v = (f, c) => getVal(msh, f, 1, c ?? null, null);
+    const code = v(9,1), ev = v(9,2);
+    h += chip('Nachrichtentyp', v(9), [TABLES['0076'][code], TABLES['0003'][ev]].filter(Boolean).join(' – '));
+    h += chip('Version', v(12,1));
+    h += chip('Control-ID', v(10));
+    h += chip('Zeitpunkt', fmtDate(v(7,1)) || v(7,1));
+    h += chip('Sender', [v(3,1), v(4,1)].filter(Boolean).join(' @ '));
+    h += chip('Empfänger', [v(5,1), v(6,1)].filter(Boolean).join(' @ '));
+    h += chip('Verarbeitung', v(11,1), TABLES['0103'][v(11,1)]);
+    h += chip('Zeichensatz', v(18));
+  } else {
+    h += chip('Hinweis', 'Kein MSH-Segment', 'Standard-Trennzeichen |^~\\& angenommen', 'warn');
+  }
+  const segCounts = Object.entries(msg.counts).map(([k, n]) => n > 1 ? k + '×' + n : k).join(' ');
+  h += chip('Segmente', String(msg.segs.length), segCounts);
+  const bad = msg.segs.filter(s => s.invalid).length;
+  if(bad) h += chip('Warnung', bad + ' ungültige Zeile(n)', 'rot unterstrichen', 'warn');
+  return h;
+}
+function renderChips(){ $('#chips').innerHTML = state.msg ? summaryChips(state.msg) : ''; }
+
+function renderRaw(){
+  const box = $('#viewRaw'); const msg = state.msg;
+  if(!msg){
+    box.innerHTML = `<div class="empty-state"><b>Noch keine Nachricht</b><br>Füge oben eine HL7-v2-Nachricht ein oder lade ein Beispiel.<br><br>Danach: mit der Maus über ein Feld fahren, um den Namen zu sehen, und klicken, um alle Details zu öffnen.</div>`;
+    return;
+  }
+  box.innerHTML = msg.segs.map((seg, si) => `<div class="ln"><div class="no">${si+1}</div><div class="tx">${segHTML(seg, si, 'x', msg.enc, null, settings.fieldNums)}</div></div>`).join('');
+  applyHighlight();
+}
+
+function allLeaves(msg){
+  const out = [];
+  msg.segs.forEach((seg, si) => {
+    if(seg.invalid) return;
+    for(let f = 1; f < seg.fields.length; f++){
+      const fd = seg.fields[f]; if(!fd) continue;
+      fd.reps.forEach((rp, ri) => rp.comps.forEach((cp, ci) => cp.subs.forEach((sv, xi) => {
+        if(sv === '') return;
+        const ls = leafSel([seg], f, ri+1, ci+1, xi+1);
+        out.push({ si, seg, f, r: ri+1, c: ls.c, s: ls.s, rc: ci+1, rs: xi+1,
+          path: fmtPath(segLabel(seg, true), f, ls.showRep ? ri+1 : null, ls.c, ls.s),
+          name: shortName(seg, f, ls.c, ls.s), value: sv });
+      })));
+    }
+  });
+  return out;
+}
+
+function renderList(){
+  const box = $('#listBody'); const msg = state.msg;
+  if(!msg){ box.innerHTML = ''; return; }
+  const q = $('#listFilter').value.trim().toLowerCase();
+  const rows = allLeaves(msg).filter(x => !q || x.path.toLowerCase().includes(q) || x.name.toLowerCase().includes(q) || x.value.toLowerCase().includes(q));
+  const cur = state.sel;
+  box.innerHTML = `<table class="t"><thead><tr><th>Pfad</th><th>Name</th><th>Wert</th></tr></thead><tbody>` +
+    rows.map(x => {
+      const isCur = cur && cur.si === x.si && cur.f === x.f && cur.r === x.r && cur.c === x.c && cur.s === x.s;
+      const v = x.value.length > 200 ? x.value.slice(0,200) + '…' : x.value;
+      return `<tr data-pick="${x.si}:${x.f}:${x.r}:${x.c ?? ''}:${x.s ?? ''}"${isCur ? ' class="cur"' : ''}><td class="p">${esc(x.path)}</td><td>${esc(x.name)}</td><td class="v">${esc(v)}</td></tr>`;
+    }).join('') + `</tbody></table>` + (rows.length ? '' : `<div class="empty-state">Keine Treffer</div>`);
+}
+
+function applyHighlight(){
+  const root = $('#viewRaw');
+  $$('.lf.sel', root).forEach(e => e.classList.remove('sel'));
+  $$('.fd.sf', root).forEach(e => e.classList.remove('sf'));
+  const s = state.sel; if(!s) return;
+  const fdEl = root.querySelector(`.fd[data-f="x:${s.si}:${s.f}"]`);
+  if(fdEl) fdEl.classList.add('sf');
+  let prefix = `x:${s.si}:${s.f}:`;
+  if(s.r != null){ prefix += s.r + ':'; if(s.c != null){ prefix += s.c + ':'; if(s.s != null) prefix += s.s; } }
+  const sel = s.s != null ? `.lf[data-k="${prefix}"]` : `.lf[data-k^="${prefix}"]`;
+  const els = $$(sel, root);
+  els.forEach(e => e.classList.add('sel'));
+  return els[0];
+}
+
+function select(sel, scroll){
+  state.sel = sel;
+  const first = applyHighlight();
+  if(scroll && first && state.view === 'raw') first.scrollIntoView({ block:'center', behavior:'smooth' });
+  if(state.view === 'list') renderList();
+  renderInspector();
+}
+
+/* ---------- Inspector (Analyse) ---------- */
+function crumbHTML(seg, f, c, s){
+  const d = describe(seg, f, c, s);
+  const tcode = t => t ? `<code title="${esc(DTNAME[t] || '')}">${esc(t)}</code>` : '';
+  let h = `<div class="crumb">`;
+  h += `<div class="lvl"><span class="n">${seg.name}</span><span>${esc(d.segDesc)}</span></div>`;
+  h += `<div class="lvl${c == null ? ' leaf' : ''}"><span class="n">${f}</span><span>${esc(d.field ? d.field.name : 'Feld ' + f + ' (nicht definiert)')} ${tcode(d.field && d.field.type)}</span></div>`;
+  if(c != null) h += `<div class="lvl${s == null ? ' leaf' : ''}"><span class="n">.${c}</span><span>${esc(d.comp ? d.comp.name : 'Komponente ' + c)} ${tcode(d.comp && d.comp.type)}</span></div>`;
+  if(s != null) h += `<div class="lvl leaf"><span class="n">.${s}</span><span>${esc(d.sub ? d.sub.name : 'Subkomponente ' + s)} ${tcode(d.sub && d.sub.type)}</span></div>`;
+  return h + `</div>`;
+}
+
+function interpretHTML(seg, sel, enc){
+  const d = describe(seg, sel.f, sel.c, sel.s);
+  const val = getVal(seg, sel.f, sel.r, sel.c, sel.s);
+  const leafv = getVal(seg, sel.f, sel.r || 1, sel.c || 1, sel.s || 1);
+  const rows = [];
+  const t = leafType(d, sel.c, sel.s);
+  if(t) rows.push(['Datentyp', t + (DTNAME[t] ? ' – ' + DTNAME[t] : '')]);
+  if(['DTM','DT','TS'].includes(t) && leafv){ const fd = fmtDate(leafv); if(fd) rows.push(['Datum/Zeit', fd]); }
+  const tl = tableLookup(seg, sel.f, sel.c, leafv);
+  if(tl && leafv) rows.push(['HL7-Tabelle ' + tl.table, tl.text ? leafv.trim() + ' = ' + tl.text : leafv.trim() + ' (nicht in Standardtabelle)']);
+  rows.push(['Länge', val.length + ' Zeichen']);
+  const fd = seg.fields[sel.f];
+  if(fd && fd.reps.length > 1) rows.push(['Wiederholungen', fd.reps.length + (sel.r ? ' (angezeigt: ' + sel.r + ')' : '')]);
+  rows.push(['Position', 'Zeile ' + (sel.si + 1) + (seg.multi ? ' · ' + seg.name + ' #' + seg.occ + ' von ' + state_counts(seg) : '')]);
+  let h = `<dl class="kv">` + rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('') + `</dl>`;
+  // Eingebettete Datei (ED) herunterladen
+  if(seg.name === 'OBX' && sel.f === 5 && getVal(seg,2,1,1,1).trim() === 'ED'){
+    const r = sel.r || 1;
+    const data = getVal(seg,5,r,5,null);
+    if(data) h += `<div style="margin-top:10px"><button class="btn sm" data-ed="${sel.si}:${r}">Eingebettete Datei herunterladen (${esc((getVal(seg,5,r,2,null) + '/' + getVal(seg,5,r,3,null)).toLowerCase())})</button></div>`;
+  }
+  return h;
+}
+function state_counts(seg){ const m = state.msg; return m && m.counts[seg.name] || '?'; }
+
+function valueBox(val, enc, cls){
+  if(val === '') return `<pre class="val empty${cls ? ' ' + cls : ''}">(leer)</pre>`;
+  const dec = decodeEsc(val, enc);
+  let h = `<pre class="val${cls ? ' ' + cls : ''}">${esc(val)}</pre>`;
+  if(dec !== val) h += `<div class="hint" style="margin:6px 0 3px">Dekodiert (Escape-Sequenzen):</div><pre class="val${cls ? ' ' + cls : ''}">${esc(dec)}</pre>`;
+  return h;
+}
+
+function breakdownHTML(seg, sel, segsForSel){
+  const fd = seg.fields[sel.f]; if(!fd || fd.special) return '';
+  const d = describe(seg, sel.f, null, null);
+  const defs = d.field && DT[d.field.type] || [];
+  const hasComps = fd.reps.some(rp => rp.comps.length > 1) || defs.length;
+  if(!hasComps) return '';
+  const multi = fd.reps.length > 1;
+  let h = `<div class="ib"><h4>Aufbau ${esc(fmtPath(seg.name, sel.f, null, null, null))} ${d.field ? '<span style="text-transform:none;letter-spacing:0;font-weight:500">' + esc(d.field.type) + '</span>' : ''}<label class="chk r"><input type="checkbox" data-hide-empty ${settings.hideEmpty ? 'checked' : ''}> leere ausblenden</label></h4>`;
+  h += `<table class="t"><tbody>`;
+  fd.reps.forEach((rp, ri) => {
+    const r = ri + 1;
+    if(multi) h += `<tr><td colspan="3" style="font-weight:600;color:var(--muted);font-size:11px;padding-top:8px">WIEDERHOLUNG ${r}</td></tr>`;
+    const n = Math.max(defs.length, rp.comps.length);
+    for(let c = 1; c <= n; c++){
+      const cp = rp.comps[c-1]; const v = cp ? cp.raw : '';
+      const cd = splitDef(defs[c-1]);
+      if(settings.hideEmpty && v === '') continue;
+      const isCur = sel.r === r && sel.c === c && sel.s == null;
+      const subDefs = cd && DT[cd.type] || [];
+      const subMulti = cp && cp.subs.length > 1;
+      h += `<tr data-pick="${sel.si}:${sel.f}:${r}:${c}:"${isCur ? ' class="cur"' : ''}${v === '' ? ' class="mt"' : ''}><td class="p">${esc(fmtPath(seg.name, sel.f, multi ? r : null, c, null))}</td><td>${esc(cd ? cd.name : '—')} <span class="ty">${esc(cd ? cd.type : '')}</span></td><td class="v">${esc(v.length > 120 ? v.slice(0,120) + '…' : v)}</td></tr>`;
+      if(subMulti){
+        cp.subs.forEach((sv, xi) => {
+          const s = xi + 1; if(settings.hideEmpty && sv === '') return;
+          const sd = splitDef(subDefs[xi]);
+          const isCurS = sel.r === r && sel.c === c && sel.s === s;
+          h += `<tr class="sub${isCurS ? ' cur' : ''}${sv === '' ? ' mt' : ''}" data-pick="${sel.si}:${sel.f}:${r}:${c}:${s}"><td class="p">${esc(fmtPath(seg.name, sel.f, multi ? r : null, c, s))}</td><td>${esc(sd ? sd.name : '—')}</td><td class="v">${esc(sv)}</td></tr>`;
+        });
+      }
+    }
+  });
+  return h + `</tbody></table></div>`;
+}
+
+function segTableHTML(seg, si, curF){
+  if(seg.invalid) return '';
+  const sd = SEGS[seg.name];
+  const n = Math.max(sd ? sd.f.length : 0, seg.fields.length - 1);
+  let h = `<div class="ib"><h4>Segment ${esc(segLabel(seg, true))} – alle Felder<label class="chk r"><input type="checkbox" data-hide-empty ${settings.hideEmpty ? 'checked' : ''}> leere ausblenden</label></h4><table class="t"><tbody>`;
+  for(let f = 1; f <= n; f++){
+    const fd = seg.fields[f]; const v = fd ? fd.raw : '';
+    if(settings.hideEmpty && v === '' && f !== curF) continue;
+    const def = sd && splitDef(sd.f[f-1]);
+    let type = def ? def.type : '';
+    if(seg.name === 'OBX' && f === 5){ const vt = getVal(seg,2,1,1,1).trim(); if(vt) type = vt; }
+    h += `<tr data-pick="${si}:${f}:::"${f === curF ? ' class="cur"' : (v === '' ? ' class="mt"' : '')}><td class="p">${esc(fmtPath(seg.name, f, null, null, null))}</td><td>${esc(def ? def.name : '—')} <span class="ty">${esc(type)}</span></td><td class="v">${esc(v.length > 120 ? v.slice(0,120) + '…' : v)}</td></tr>`;
+  }
+  return h + `</tbody></table></div>`;
+}
+
+function renderInspector(){
+  const box = $('#inspBody'); const msg = state.msg; const sel = state.sel;
+  if(!msg){ box.innerHTML = ''; return; }
+  if(!sel){
+    box.innerHTML = `<div class="ib"><div class="hint">Klicke in der Nachricht auf einen Wert – hier erscheinen Pfad (z.B. <code>OBX-3.2</code>), Feldname, Datentyp, Interpretation und der komplette Aufbau des Feldes.<br><br>Klick auf einen <b>Segmentnamen</b> zeigt alle Felder des Segments.<br><kbd>Esc</kbd> hebt die Auswahl auf.</div></div>`;
+    return;
+  }
+  const seg = msg.segs[sel.si];
+  if(sel.f == null){ box.innerHTML = segTableHTML(seg, sel.si, null); return; }
+  const fd = seg.fields[sel.f];
+  const showRep = fd && fd.reps.length > 1 && sel.r != null;
+  const path = fmtPath(seg.name, sel.f, showRep ? sel.r : null, sel.c, sel.s);
+  const full = fmtPath(segLabel(seg, true), sel.f, showRep ? sel.r : null, sel.c, sel.s);
+  const val = getVal(seg, sel.f, sel.r, sel.c, sel.s);
+  let h = `<div class="ib"><div class="path"><div class="big">${esc(path)}</div><button class="btn sm" data-copy="${esc(path)}">Pfad kopieren</button></div>`;
+  if(full !== path) h += `<div class="alt">eindeutig: ${esc(full)}</div>`;
+  h += crumbHTML(seg, sel.f, sel.c, sel.s) + `</div>`;
+  h += `<div class="ib"><h4>Wert<span class="r"><button class="btn sm" data-copyval>Wert kopieren</button></span></h4>${valueBox(val, msg.enc)}${interpretHTML(seg, sel, msg.enc)}</div>`;
+  h += breakdownHTML(seg, sel);
+  h += segTableHTML(seg, sel.si, sel.f);
+  box.innerHTML = h;
+}
+
+/* ---------- Pfadsuche ---------- */
+const QRE = /^\s*([A-Za-z][A-Za-z0-9]{2})\s*(?:\[(\d+)\]|\((\d+)\))?\s*(?:[-.]?\s*(\d+)(?:\[(\d+)\]|\((\d+)\))?(?:\.(\d+))?(?:\.(\d+))?)?\s*$/;
+function parsePath(q){
+  const m = QRE.exec(q); if(!m) return null;
+  const num = x => x == null ? null : +x;
+  return { seg: m[1].toUpperCase(), occ: num(m[2] ?? m[3]), f: num(m[4]), r: num(m[5] ?? m[6]), c: num(m[7]), s: num(m[8]) };
+}
+function runQuery(){
+  const q = $('#query').value.trim(); const box = $('#qres'); const msg = state.msg;
+  $$('#viewRaw .lf.hit').forEach(e => e.classList.remove('hit'));
+  if(!q || !msg){ box.innerHTML = q ? '' : `<div class="hint">Notation: <code>SEG[n]-Feld[Wdh].Komp.Sub</code> – Trenner <code>-</code>, <code>.</code> oder keiner.</div>`; return; }
+  const p = parsePath(q);
+  if(!p){ box.innerHTML = `<div class="hint">Unbekanntes Format. Beispiele: <code>PID-5.1</code>, <code>OBX[2]-5</code>, <code>MSH9.2</code></div>`; return; }
+  const res = [];
+  msg.segs.forEach((seg, si) => {
+    if(seg.name !== p.seg || (p.occ && seg.occ !== p.occ)) return;
+    if(p.f == null){ res.push({ pick:`${si}::::`, path: segLabel(seg, true), val: seg.line }); return; }
+    const fd = seg.fields[p.f];
+    const reps = p.r != null ? [p.r] : (p.c == null ? [null] : (fd ? fd.reps.map((_, i) => i + 1) : [1]));
+    reps.forEach(r => {
+      const showRep = r != null && (fd && fd.reps.length > 1 || r > 1);
+      res.push({ pick:`${si}:${p.f}:${r ?? ''}:${p.c ?? ''}:${p.s ?? ''}`, path: fmtPath(segLabel(seg, true), p.f, showRep ? r : null, p.c, p.s), val: getVal(seg, p.f, r, p.c, p.s) });
+      let prefix = `x:${si}:${p.f}:`; if(r != null){ prefix += r + ':'; if(p.c != null){ prefix += p.c + ':'; if(p.s != null) prefix += p.s; } }
+      $$(p.s != null && r != null ? `#viewRaw .lf[data-k="${prefix}"]` : `#viewRaw .lf[data-k^="${prefix}"]`).forEach(e => e.classList.add('hit'));
+    });
+  });
+  if(!res.length){ box.innerHTML = `<div class="hint">Kein Segment <b>${esc(p.seg)}</b>${p.occ ? ' #' + p.occ : ''} in der Nachricht.</div>`; return; }
+  let name = '';
+  const firstSeg = msg.segs.find(s => s.name === p.seg);
+  if(firstSeg && p.f != null) name = `<div class="hint" style="margin-bottom:4px">${esc(shortName(firstSeg, p.f, p.c, p.s))}</div>`;
+  box.innerHTML = name + res.slice(0, 200).map(x => `<div data-pick="${x.pick}"><span class="p">${esc(x.path)}</span><span class="v">${x.val === '' ? '<i style="color:var(--faint)">(leer)</i>' : esc(x.val.length > 160 ? x.val.slice(0,160) + '…' : x.val)}</span></div>`).join('');
+}
+
+function parsePick(str){
+  const [si, f, r, c, s] = str.split(':').map(x => x === '' ? null : +x);
+  return { si, f, r, c, s };
+}
+
+/* ---------- JSON-Export ---------- */
+function exportJson(){
+  if(!state.msg) return;
+  const obj = {};
+  allLeaves(state.msg).forEach(x => { obj[x.path] = x.value; });
+  copy(JSON.stringify(obj, null, 2), Object.keys(obj).length + ' Felder als JSON');
+}
+
+/* =====================================================================
+   VERGLEICH
+   ===================================================================== */
+function parseIgnore(){
+  const set = new Set();
+  if(!settings.ignoreOn) return set;
+  settings.ignore.split(/[,;\s]+/).forEach(t => {
+    const p = parsePath(t); if(!p || p.f == null) return;
+    set.add(p.seg + '-' + p.f + (p.c != null ? '.' + p.c : ''));
+  });
+  return set;
+}
+
+function fieldSim(a, b){
+  const n = Math.max(a.fields.length, b.fields.length) - 1; if(n <= 0) return 1;
+  let eq = 0;
+  for(let f = 1; f <= n; f++){ if((a.fields[f] ? a.fields[f].raw : '') === (b.fields[f] ? b.fields[f].raw : '')) eq++; }
+  return eq / n;
+}
+
+function alignSegs(A, B){
+  const n = A.length, m = B.length;
+  const sim = Array.from({ length: n }, (_, i) => Array.from({ length: m }, (_, j) => A[i].name === B[j].name && !A[i].invalid ? 1 + fieldSim(A[i], B[j]) : -1));
+  const dp = Array.from({ length: n + 1 }, () => new Float64Array(m + 1));
+  for(let i = n - 1; i >= 0; i--) for(let j = m - 1; j >= 0; j--){
+    let best = Math.max(dp[i+1][j], dp[i][j+1]);
+    if(sim[i][j] >= 0) best = Math.max(best, sim[i][j] + dp[i+1][j+1]);
+    dp[i][j] = best;
+  }
+  const rows = []; let i = 0, j = 0;
+  while(i < n || j < m){
+    if(i < n && j < m && sim[i][j] >= 0 && dp[i][j] === sim[i][j] + dp[i+1][j+1]){ rows.push({ ai: i, bi: j }); i++; j++; }
+    else if(i < n && (j >= m || dp[i][j] === dp[i+1][j])){ rows.push({ ai: i, bi: null }); i++; }
+    else { rows.push({ ai: null, bi: j }); j++; }
+  }
+  return rows;
+}
+
+function diffSegs(a, b, ignore){
+  const leaves = new Set(), list = [];
+  const nf = Math.max(a.fields.length, b.fields.length);
+  const extraA = [], extraB = [];
+  for(let f = 1; f < nf; f++){
+    if(ignore.has(a.name + '-' + f)) continue;
+    const fa = a.fields[f], fb = b.fields[f];
+    if((fa ? fa.raw : '') === (fb ? fb.raw : '')) continue;
+    const nr = Math.max(fa ? fa.reps.length : 0, fb ? fb.reps.length : 0);
+    for(let r = 1; r <= nr; r++){
+      const ra = fa && fa.reps[r-1], rb = fb && fb.reps[r-1];
+      const nc = Math.max(ra ? ra.comps.length : 0, rb ? rb.comps.length : 0);
+      for(let c = 1; c <= nc; c++){
+        if(ignore.has(a.name + '-' + f + '.' + c)) continue;
+        const ca = ra && ra.comps[c-1], cb = rb && rb.comps[c-1];
+        const ns = Math.max(ca ? ca.subs.length : 0, cb ? cb.subs.length : 0);
+        for(let s = 1; s <= ns; s++){
+          const va = ca ? (ca.subs[s-1] ?? '') : '', vb = cb ? (cb.subs[s-1] ?? '') : '';
+          if(va !== vb){
+            const key = f + ':' + r + ':' + c + ':' + s;
+            leaves.add(key); list.push({ f, r, c, s, va, vb });
+            if(!fa) extraA.push(key); if(!fb) extraB.push(key);
+          }
+        }
+      }
+    }
+  }
+  return { leaves, list, extraA, extraB };
+}
+
+function runCompare(){
+  const ta = $('#cmpA').value, tb = $('#cmpB').value;
+  const view = $('#cmpView'), chips = $('#cmpChips');
+  state.cmpSel = null;
+  if(!ta.trim() || !tb.trim()){
+    state.cmp = null; chips.innerHTML = '';
+    view.innerHTML = `<div class="empty-state"><b>Zwei Nachrichten einfügen</b><br>A links, B rechts – der Vergleich startet automatisch.<br>Segmente werden intelligent zugeordnet (auch bei eingefügten oder fehlenden Segmenten), Unterschiede werden bis auf Komponenten-Ebene markiert.</div>`;
+    renderCmpInspector(); return;
+  }
+  const A = splitMessages(ta)[0], B = splitMessages(tb)[0];
+  const ignore = parseIgnore();
+  const rows = alignSegs(A.segs, B.segs);
+  const mapA = {}, mapB = {};
+  let nChanged = 0, nLeaves = 0, onlyA = 0, onlyB = 0;
+  rows.forEach((row, i) => {
+    if(row.ai != null) mapA[row.ai] = i;
+    if(row.bi != null) mapB[row.bi] = i;
+    if(row.ai != null && row.bi != null){
+      row.diff = diffSegs(A.segs[row.ai], B.segs[row.bi], ignore);
+      row.kind = row.diff.list.length ? 'diff' : 'same';
+      if(row.diff.list.length){ nChanged++; nLeaves += row.diff.list.length; }
+    } else if(row.ai != null){ row.kind = 'onlyA'; onlyA++; }
+    else { row.kind = 'onlyB'; onlyB++; }
+  });
+  state.cmp = { A, B, rows, mapA, mapB, ignore };
+  const identical = !nLeaves && !onlyA && !onlyB;
+  chips.innerHTML =
+    (identical ? chip('Ergebnis', 'Identisch', ignore.size ? 'ignoriert: ' + [...ignore].join(', ') : '') :
+      chip('Unterschiede', String(nLeaves), 'Werte in ' + nChanged + ' Segment(en)', nLeaves ? 'warn' : '')) +
+    (onlyA ? chip('Nur in A', String(onlyA), 'Segment(e)') : '') +
+    (onlyB ? chip('Nur in B', String(onlyB), 'Segment(e)') : '') +
+    chip('Segmente', A.segs.length + ' / ' + B.segs.length, 'A / B') +
+    (() => { const ma = A.segs.find(s => s.name === 'MSH'), mb = B.segs.find(s => s.name === 'MSH'); if(!ma || !mb) return ''; const ta = getVal(ma,9,null,null,null), tb = getVal(mb,9,null,null,null); return chip('Typ', ta === tb ? ta : ta + ' ≠ ' + tb, '', ta === tb ? '' : 'warn'); })();
+  renderCmpView();
+  renderCmpInspector();
+}
+
+function renderCmpView(){
+  const c = state.cmp, view = $('#cmpView');
+  if(!c) return;
+  view.classList.toggle('only', settings.onlyDiff);
+  view.innerHTML = c.rows.map((row, i) => {
+    const sa = row.ai != null ? c.A.segs[row.ai] : null, sb = row.bi != null ? c.B.segs[row.bi] : null;
+    let da = null, db = null;
+    if(row.diff){ da = new Set(row.diff.leaves); da.extra = row.diff.extraA; db = new Set(row.diff.leaves); db.extra = row.diff.extraB; }
+    return `<div class="crow ${row.kind}" data-row="${i}"><div class="no">${row.ai != null ? row.ai + 1 : ''}</div><div class="cell a">${sa ? segHTML(sa, row.ai, 'a', c.A.enc, da, false) : ''}</div><div class="no">${row.bi != null ? row.bi + 1 : ''}</div><div class="cell b">${sb ? segHTML(sb, row.bi, 'b', c.B.enc, db, false) : ''}</div></div>`;
+  }).join('');
+  applyCmpHighlight();
+}
+
+function applyCmpHighlight(){
+  const view = $('#cmpView');
+  $$('.lf.sel', view).forEach(e => e.classList.remove('sel'));
+  $$('.fd.sf', view).forEach(e => e.classList.remove('sf'));
+  const s = state.cmpSel, c = state.cmp; if(!s || !c) return null;
+  const row = c.rows[s.row]; let first = null;
+  [['a', row.ai], ['b', row.bi]].forEach(([side, si]) => {
+    if(si == null) return;
+    const fdEl = view.querySelector(`.fd[data-f="${side}:${si}:${s.f}"]`); if(fdEl) fdEl.classList.add('sf');
+    let prefix = `${side}:${si}:${s.f}:`;
+    if(s.r != null){ prefix += s.r + ':'; if(s.c != null){ prefix += s.c + ':'; if(s.s != null) prefix += s.s; } }
+    const els = $$(s.s != null ? `.lf[data-k="${prefix}"]` : `.lf[data-k^="${prefix}"]`, view);
+    els.forEach(e => e.classList.add('sel'));
+    if(!first) first = els[0];
+  });
+  return first;
+}
+
+function cmpSelect(sel, scroll){
+  state.cmpSel = sel;
+  const first = applyCmpHighlight();
+  if(scroll){
+    const rowEl = $(`#cmpView .crow[data-row="${sel.row}"]`);
+    (first || rowEl) && (first || rowEl).scrollIntoView({ block:'center', behavior:'smooth' });
+  }
+  renderCmpInspector();
+}
+
+function diffListEntries(){
+  const c = state.cmp; const out = [];
+  c.rows.forEach((row, i) => {
+    if(row.kind === 'onlyA' || row.kind === 'onlyB'){
+      const seg = row.kind === 'onlyA' ? c.A.segs[row.ai] : c.B.segs[row.bi];
+      out.push({ row: i, kind: row.kind, path: segLabel(seg, true), name: SEGS[seg.name] ? SEGS[seg.name].n : '', line: seg.line });
+    } else if(row.kind === 'diff'){
+      const sa = c.A.segs[row.ai], sb = c.B.segs[row.bi];
+      const label = sa.multi || sb.multi ? sa.name + '[' + sa.occ + ']' : sa.name;
+      row.diff.list.forEach(d => {
+        const ls = leafSel([sa, sb], d.f, d.r, d.c, d.s);
+        out.push({ row: i, kind:'chg', f: d.f, r: d.r, c: ls.c, s: ls.s,
+          path: fmtPath(label, d.f, ls.showRep ? d.r : null, ls.c, ls.s), name: shortName(sa, d.f, ls.c, ls.s), va: d.va, vb: d.vb });
+      });
+    }
+  });
+  return out;
+}
+
+function renderCmpInspector(){
+  const box = $('#cmpInsp'), c = state.cmp;
+  if(!c){ box.innerHTML = `<div class="ib"><div class="hint">Hier erscheinen die Liste aller Unterschiede und – nach einem Klick – die Werte aus A und B nebeneinander.</div></div>`; return; }
+  let h = '';
+  const s = state.cmpSel;
+  if(s){
+    const row = c.rows[s.row];
+    const sa = row.ai != null ? c.A.segs[row.ai] : null, sb = row.bi != null ? c.B.segs[row.bi] : null;
+    const seg = sa || sb;
+    const multiRep = [sa, sb].some(x => x && x.fields[s.f] && x.fields[s.f].reps.length > 1);
+    const path = fmtPath(seg.name, s.f, multiRep && s.r != null ? s.r : null, s.c, s.s);
+    const full = fmtPath(segLabel(seg, true), s.f, multiRep && s.r != null ? s.r : null, s.c, s.s);
+    const va = sa ? getVal(sa, s.f, s.r, s.c, s.s) : null, vb = sb ? getVal(sb, s.f, s.r, s.c, s.s) : null;
+    const ignored = c.ignore.has(seg.name + '-' + s.f) || (s.c != null && c.ignore.has(seg.name + '-' + s.f + '.' + s.c));
+    let badge;
+    if(!sa) badge = `<span class="badge add">Segment nur in B</span>`;
+    else if(!sb) badge = `<span class="badge del">Segment nur in A</span>`;
+    else if(va === vb) badge = `<span class="badge same">gleich</span>`;
+    else badge = `<span class="badge chg">geändert${ignored ? ' (ignoriert)' : ''}</span>`;
+    h += `<div class="ib"><div class="path"><div class="big">${esc(path)}</div><button class="btn sm" data-copy="${esc(path)}">Pfad kopieren</button></div>`;
+    if(full !== path) h += `<div class="alt">eindeutig: ${esc(full)}</div>`;
+    h += `<div style="margin-top:8px">${badge}</div>` + crumbHTML(seg, s.f, s.c, s.s) + `</div>`;
+    h += `<div class="ib"><h4>Werte</h4><div class="vcmp"><div class="tag">A</div><div>${sa ? valueBox(va, c.A.enc, 'a') : '<pre class="val empty">(Segment fehlt)</pre>'}</div><div class="tag">B</div><div>${sb ? valueBox(vb, c.B.enc, 'b') : '<pre class="val empty">(Segment fehlt)</pre>'}</div></div>`;
+    const tA = sa && fmtDate(getVal(sa, s.f, s.r || 1, s.c || 1, s.s || 1)), tB = sb && fmtDate(getVal(sb, s.f, s.r || 1, s.c || 1, s.s || 1));
+    const lt = leafType(describe(seg, s.f, s.c, s.s), s.c, s.s);
+    if(['DTM','DT','TS'].includes(lt) && (tA || tB)) h += `<dl class="kv"><dt>A Datum</dt><dd>${esc(tA || '–')}</dd><dt>B Datum</dt><dd>${esc(tB || '–')}</dd></dl>`;
+    if(s.c != null && sa && sb) h += `<div class="hint" style="margin:10px 0 4px">Gesamtes Feld ${esc(fmtPath(seg.name, s.f, null, null, null))}:</div><div class="vcmp"><div class="tag">A</div><div>${valueBox(getVal(sa, s.f, null, null, null), c.A.enc, 'a')}</div><div class="tag">B</div><div>${valueBox(getVal(sb, s.f, null, null, null), c.B.enc, 'b')}</div></div>`;
+    h += `</div>`;
+  }
+  const entries = diffListEntries();
+  h += `<div class="ib"><h4>Unterschiede (${entries.length})<span class="r">${entries.length ? '<button class="btn sm" data-copydiff>als Text kopieren</button>' : ''}</span></h4>`;
+  if(!entries.length) h += `<div class="hint">Keine Unterschiede${c.ignore.size ? ' (ignoriert: ' + esc([...c.ignore].join(', ')) + ')' : ''}.</div>`;
+  else {
+    h += `<div class="dlist">` + entries.slice(0, 1000).map((e, idx) => {
+      const isCur = s && s.row === e.row && e.kind === 'chg' && s.f === e.f && s.r === e.r && s.c === e.c && s.s === e.s;
+      const cut = v => v.length > 80 ? v.slice(0, 80) + '…' : v;
+      if(e.kind === 'chg') return `<div data-dpick="${idx}"${isCur ? ' class="cur"' : ''}><span class="p">${esc(e.path)}</span><span class="nm">${esc(e.name)}</span><span class="vv"><span class="va">${e.va === '' ? '<i>(leer)</i>' : esc(cut(e.va))}</span><span class="arrow">→</span><span class="vb">${e.vb === '' ? '<i>(leer)</i>' : esc(cut(e.vb))}</span></span></div>`;
+      return `<div data-dpick="${idx}"><span class="p">${esc(e.path)}</span><span class="nm"><span class="badge ${e.kind === 'onlyA' ? 'del' : 'add'}">${e.kind === 'onlyA' ? 'nur in A' : 'nur in B'}</span> ${esc(e.name)}</span></div>`;
+    }).join('') + `</div>`;
+    if(entries.length > 1000) h += `<div class="hint">… und ${entries.length - 1000} weitere</div>`;
+  }
+  h += `</div>`;
+  box.innerHTML = h;
+  state.cmpEntries = entries;
+}
+
+function diffAsText(){
+  return (state.cmpEntries || []).map(e => e.kind === 'chg' ? `${e.path}\t${e.name}\tA: ${e.va}\tB: ${e.vb}` : `${e.path}\t${e.kind === 'onlyA' ? 'nur in A' : 'nur in B'}`).join('\n');
+}
+
+/* =====================================================================
+   Events
+   ===================================================================== */
+function debounce(fn, ms){ let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+// Tabs
+$$('.tabs button').forEach(b => b.addEventListener('click', () => {
+  $$('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  $('#view-analyze').classList.toggle('hidden', b.dataset.tab !== 'analyze');
+  $('#view-compare').classList.toggle('hidden', b.dataset.tab !== 'compare');
+}));
+function showTab(t){ $(`.tabs button[data-tab="${t}"]`).click(); }
+
+// Analyse-Eingabe
+$('#inA').addEventListener('input', debounce(() => { state.msgIdx = 0; analyze(); }, 150));
+$$('[data-sample]').forEach(b => b.addEventListener('click', () => { $('#inA').value = SAMPLES[b.dataset.sample].replace(/\r/g, '\n'); state.msgIdx = 0; analyze(); }));
+$('#clearA').addEventListener('click', () => { $('#inA').value = ''; $('#query').value = ''; analyze(); $('#inA').focus(); });
+$('#msgSel').addEventListener('change', e => { state.msgIdx = +e.target.value; state.msg = state.msgs[state.msgIdx]; state.sel = null; renderAnalyze(); });
+$('#toCompare').addEventListener('click', () => { $('#cmpA').value = $('#inA').value; showTab('compare'); runCompare(); });
+$('#copyJson').addEventListener('click', exportJson);
+$('#fieldNums').addEventListener('change', e => { settings.fieldNums = e.target.checked; saveSettings(); renderRaw(); runQuery(); });
+$$('[data-view]').forEach(b => b.addEventListener('click', () => {
+  state.view = b.dataset.view;
+  $$('[data-view]').forEach(x => x.classList.toggle('on', x === b));
+  $('#viewRaw').classList.toggle('hidden', state.view !== 'raw');
+  $('#viewList').classList.toggle('hidden', state.view !== 'list');
+  if(state.view === 'list') renderList(); else applyHighlight();
+}));
+$('#listFilter').addEventListener('input', debounce(renderList, 120));
+$('#query').addEventListener('input', debounce(runQuery, 100));
+$('#query').addEventListener('keydown', e => { if(e.key === 'Enter'){ const first = $('#qres [data-pick]'); if(first) first.click(); } });
+
+// Klick in Nachricht
+$('#viewRaw').addEventListener('click', e => {
+  const lf = e.target.closest('.lf');
+  if(lf){
+    const [, si, f, r, c, s] = lf.dataset.k.split(':'); const seg = state.msg.segs[+si];
+    const ls = leafSel([seg], +f, +r, +c, +s);
+    select({ si: +si, f: +f, r: +r, c: ls.c, s: ls.s }, false);
+    return;
+  }
+  const sg = e.target.closest('.sg');
+  if(sg){ const si = +sg.dataset.sg.split(':')[1]; select({ si, f: null, r: null, c: null, s: null }, false); }
+});
+// Klick in Listen/Tabellen
+document.addEventListener('click', e => {
+  const pick = e.target.closest('[data-pick]');
+  if(pick && (pick.closest('#view-analyze'))){
+    const p = parsePick(pick.dataset.pick);
+    if(p.f == null){ select({ si: p.si, f: null, r: null, c: null, s: null }, true); return; }
+    select(p, true); return;
+  }
+  const cp = e.target.closest('[data-copy]'); if(cp){ copy(cp.dataset.copy, cp.dataset.copy); return; }
+  if(e.target.closest('[data-copyval]')){
+    const s = state.sel; if(s) copy(getVal(state.msg.segs[s.si], s.f, s.r, s.c, s.s), 'Wert'); return;
+  }
+  if(e.target.closest('[data-copydiff]')){ copy(diffAsText(), (state.cmpEntries || []).length + ' Unterschiede'); return; }
+  const ed = e.target.closest('[data-ed]');
+  if(ed){
+    const [si, r] = ed.dataset.ed.split(':').map(Number); const seg = state.msg.segs[si];
+    try{
+      const raw = decodeEsc(getVal(seg,5,r,5,null), state.msg.enc).replace(/\s+/g, '');
+      const bin = atob(raw); const bytes = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      let t1 = getVal(seg,5,r,2,null).toLowerCase(), t2 = getVal(seg,5,r,3,null).toLowerCase();
+      if(t1 === 'ap') t1 = 'application'; if(t1 === 'im') t1 = 'image'; if(t1 === 'tx') t1 = 'text';
+      const blob = new Blob([bytes], { type: t1 && t2 ? t1 + '/' + t2 : 'application/octet-stream' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'obx5_anhang' + (t2 ? '.' + t2 : '.bin'); a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }catch(err){ toast('Daten sind kein gültiges Base64'); }
+  }
+});
+document.addEventListener('change', e => {
+  if(e.target.matches('[data-hide-empty]')){ settings.hideEmpty = e.target.checked; saveSettings(); renderInspector(); }
+});
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && !e.target.matches('textarea,input')){
+    if(!$('#view-analyze').classList.contains('hidden')) select(null); else { state.cmpSel = null; applyCmpHighlight(); renderCmpInspector(); }
+  }
+});
+
+// Tooltip
+const tip = $('#tip');
+function showTip(e, html){ tip.innerHTML = html; tip.style.display = 'block'; moveTip(e); }
+function moveTip(e){
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.clientX + 14, y = e.clientY + 16;
+  if(x + w > innerWidth - 8) x = innerWidth - w - 8;
+  if(y + h > innerHeight - 8) y = e.clientY - h - 12;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function tipFor(lf){
+  const [side, si, f, r, c, s] = lf.dataset.k.split(':');
+  let seg, segs;
+  if(side === 'x'){ seg = state.msg.segs[+si]; segs = [seg]; }
+  else {
+    const cm = state.cmp; const row = cm.rows[side === 'a' ? cm.mapA[+si] : cm.mapB[+si]];
+    const sa = row.ai != null ? cm.A.segs[row.ai] : null, sb = row.bi != null ? cm.B.segs[row.bi] : null;
+    seg = side === 'a' ? sa : sb; segs = [sa, sb].filter(Boolean);
+  }
+  const ls = leafSel(segs, +f, +r, +c, +s);
+  const path = fmtPath(segLabel(seg, true), +f, ls.showRep ? +r : null, ls.c, ls.s);
+  const v = getVal(seg, +f, +r, +c, +s);
+  return `<div class="tp">${esc(path)}</div><div class="tn">${esc(shortName(seg, +f, ls.c, ls.s))}</div>${v ? `<div class="tv">${esc(v.length > 140 ? v.slice(0,140) + '…' : v)}</div>` : ''}`;
+}
+['#viewRaw', '#cmpView'].forEach(id => {
+  const el = $(id);
+  el.addEventListener('mouseover', e => { const lf = e.target.closest('.lf'); if(lf && lf.dataset.k.split(':').length === 6) showTip(e, tipFor(lf)); else if(e.target.closest('.sg')) { const sg = e.target.closest('.sg'); const nm = sg.textContent; showTip(e, `<div class="tp">${esc(nm)}</div><div class="tn">${esc(SEGS[nm] ? SEGS[nm].n : (nm[0] === 'Z' ? 'Z-Segment (benutzerdefiniert)' : 'unbekanntes Segment'))}</div>`); } });
+  el.addEventListener('mousemove', e => { if(tip.style.display === 'block') moveTip(e); });
+  el.addEventListener('mouseout', e => { if(!e.relatedTarget || !el.contains(e.relatedTarget) || !(e.relatedTarget.closest('.lf') || e.relatedTarget.closest('.sg'))) tip.style.display = 'none'; });
+});
+
+// Vergleich
+const cmpDeb = debounce(runCompare, 200);
+$('#cmpA').addEventListener('input', cmpDeb);
+$('#cmpB').addEventListener('input', cmpDeb);
+$('#cmpSample').addEventListener('click', () => { $('#cmpA').value = SAMPLES.oru.replace(/\r/g, '\n'); $('#cmpB').value = SAMPLES.oruB.replace(/\r/g, '\n'); runCompare(); });
+$('#cmpSwap').addEventListener('click', () => { const a = $('#cmpA').value; $('#cmpA').value = $('#cmpB').value; $('#cmpB').value = a; runCompare(); });
+$('#cmpClear').addEventListener('click', () => { $('#cmpA').value = ''; $('#cmpB').value = ''; runCompare(); });
+$('#onlyDiff').addEventListener('change', e => { settings.onlyDiff = e.target.checked; saveSettings(); $('#cmpView').classList.toggle('only', settings.onlyDiff); });
+$('#ignoreOn').addEventListener('change', e => { settings.ignoreOn = e.target.checked; saveSettings(); runCompare(); });
+$('#ignoreList').addEventListener('input', debounce(e => { settings.ignore = e.target.value; saveSettings(); runCompare(); }, 300));
+$('#cmpView').addEventListener('click', e => {
+  const lf = e.target.closest('.lf'); if(!lf) return;
+  const parts = lf.dataset.k.split(':'); if(parts.length < 6) return;
+  const [side, si, f, r, c, s] = parts; const cm = state.cmp;
+  const rowIdx = side === 'a' ? cm.mapA[+si] : cm.mapB[+si]; const row = cm.rows[rowIdx];
+  const segs = [row.ai != null ? cm.A.segs[row.ai] : null, row.bi != null ? cm.B.segs[row.bi] : null].filter(Boolean);
+  const ls = leafSel(segs, +f, +r, +c, +s);
+  cmpSelect({ row: rowIdx, f: +f, r: +r, c: ls.c, s: ls.s }, false);
+});
+$('#cmpInsp').addEventListener('click', e => {
+  const d = e.target.closest('[data-dpick]'); if(!d) return;
+  const en = state.cmpEntries[+d.dataset.dpick];
+  if(en.kind === 'chg') cmpSelect({ row: en.row, f: en.f, r: en.r, c: en.c, s: en.s }, true);
+  else { state.cmpSel = null; applyCmpHighlight(); renderCmpInspector(); const el = $(`#cmpView .crow[data-row="${en.row}"]`); el && el.scrollIntoView({ block:'center', behavior:'smooth' }); }
+});
+
+// Einstellungen
+$('#notation').addEventListener('change', e => {
+  settings.notation = e.target.value; saveSettings();
+  renderList(); renderInspector(); runQuery();
+  if(state.cmp) renderCmpInspector();
+});
+
+/* Init */
+loadSettings();
+$('#notation').value = settings.notation;
+$('#fieldNums').checked = settings.fieldNums;
+$('#onlyDiff').checked = settings.onlyDiff;
+$('#ignoreOn').checked = settings.ignoreOn;
+$('#ignoreList').value = settings.ignore;
+analyze();
+runCompare();
+</script>
+</body>
+</html>
