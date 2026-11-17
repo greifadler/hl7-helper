@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HL7 Inspector</title>
+<title>HL7 Helper</title>
 <style>
 :root{
   --bg:#f5f6f8; --panel:#ffffff; --line:#e2e5ea; --line2:#eef0f3; --text:#1c2230; --muted:#677084; --faint:#a0a7b4;
   --accent:#0d6b6b; --accent-soft:#e0f0ef; --seg:#0d6b6b; --zseg:#8646ad;
   --sel:#ffd74a; --sel-text:#1c2230; --selfield:#fff3c4; --hover:#e5ecfb; --hit:#c9e7ff;
   --del:#fde3e1; --del-strong:#f4a9a3; --add:#dcf3e3; --add-strong:#9edbb1; --chg-strong:#ffbf57;
+  --ok:#1f8a52; --bad:#c0392b;
   --mono: ui-monospace, "JetBrains Mono", "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -19,6 +20,7 @@
     --accent:#4fc0b6; --accent-soft:#17312f; --seg:#5ccfc4; --zseg:#c591e8;
     --sel:#d9b52c; --sel-text:#111; --selfield:#3a3417; --hover:#22304a; --hit:#1c3c5a;
     --del:#432020; --del-strong:#7c3232; --add:#1b3a26; --add-strong:#2e6b43; --chg-strong:#a8781a;
+    --ok:#4cc488; --bad:#ef7a6c;
   }
 }
 *{box-sizing:border-box}
@@ -30,20 +32,26 @@ header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px
 .tabs{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:9px;border:1px solid var(--line)}
 .tabs button{border:0;background:none;padding:5px 14px;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:550}
 .tabs button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.hdr-right{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
-.hdr-right select{padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
-.offline{display:flex;align-items:center;gap:6px}
-.offline i{width:7px;height:7px;border-radius:50%;background:#2fa86b;display:inline-block}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.lang{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.lang button{border:0;background:none;padding:4px 10px;font-size:12px;font-weight:650;color:var(--muted);cursor:pointer;letter-spacing:.3px}
+.lang button.on{background:var(--accent-soft);color:var(--accent)}
+.gear{border:1px solid var(--line);background:var(--panel);border-radius:7px;width:32px;height:29px;cursor:pointer;color:var(--muted);display:grid;place-items:center;padding:0}
+.gear:hover,.gear.on{color:var(--accent);border-color:var(--accent)}
+.pop{position:absolute;right:20px;top:54px;width:310px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:14px 14px 12px;z-index:40}
+.pop label{display:block;font-size:11px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.5px;margin:0 0 5px}
+.pop select{width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg);margin-bottom:12px}
+.pop .priv{font-size:12px;color:var(--muted);border-top:1px solid var(--line2);padding-top:10px;margin-top:2px}
 main{padding:16px 20px 40px;max-width:1800px;margin:0 auto}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
 .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--line2)}
 .btn{border:1px solid var(--line);background:var(--panel);padding:4px 11px;border-radius:7px;cursor:pointer;white-space:nowrap}
 .btn:hover{border-color:var(--accent);color:var(--accent)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn.primary:hover{filter:brightness(1.08);color:#fff}
 .btn.sm{padding:2px 8px;font-size:12px}
 .chk{display:inline-flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap}
 .sp-flex{flex:1}
+.versel{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;white-space:nowrap}
+.versel select{padding:2px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);font-size:12.5px}
 textarea.hl7in{display:block;width:100%;min-height:140px;height:150px;resize:vertical;border:0;border-radius:10px 10px 0 0;padding:10px 12px;background:transparent;font:12.5px/1.55 var(--mono);white-space:pre;overflow:auto;outline:none}
 textarea.hl7in::placeholder{color:var(--faint)}
 .lbl{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px 0}
@@ -53,9 +61,10 @@ textarea.hl7in::placeholder{color:var(--faint)}
 .chip span{font-family:var(--mono)}
 .chip small{color:var(--muted);font-family:var(--sans);margin-left:4px}
 .chip.warn{border-color:#e0a03a;background:rgba(224,160,58,.1)}
+.chip.good{border-color:rgba(31,138,82,.45)}
 .workspace{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:14px;align-items:start}
 @media (max-width:1100px){.workspace{grid-template-columns:1fr}}
-.viewhead{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line2)}
+.viewhead{display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:1px solid var(--line2);flex-wrap:wrap}
 .seg-toggle{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
 .seg-toggle button{border:0;background:none;padding:3px 10px;cursor:pointer;color:var(--muted);font-size:13px}
 .seg-toggle button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
@@ -77,10 +86,9 @@ textarea.hl7in::placeholder{color:var(--faint)}
 .lf.sel.em{min-width:7px;height:1.1em;vertical-align:-2px}
 .lf.fs,.lf.enc{color:var(--muted)}
 .more{color:var(--muted);font-style:italic;font-family:var(--sans);font-size:11px}
-.bad{color:#c0392b;text-decoration:wavy underline;text-decoration-thickness:1px}
+.bad{color:var(--bad);text-decoration:wavy underline;text-decoration-thickness:1px}
 .empty-state{padding:40px 20px;text-align:center;color:var(--muted)}
 .empty-state b{color:var(--text)}
-/* list view */
 .listwrap{padding:0 0 6px}
 .filter{width:100%;border:1px solid var(--line);border-radius:7px;padding:5px 9px;background:var(--bg)}
 table.t{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -88,13 +96,12 @@ table.t th{position:sticky;top:0;background:var(--panel);text-align:left;font-we
 table.t td{padding:4px 8px;border-bottom:1px solid var(--line2);vertical-align:top}
 table.t td.p{font-family:var(--mono);white-space:nowrap;color:var(--accent);font-weight:600}
 table.t td.v{font-family:var(--mono);word-break:break-all}
-table.t td.ty{font-family:var(--mono);color:var(--muted);font-size:11px}
+table.t .ty{font-family:var(--mono);color:var(--muted);font-size:11px}
 table.t tr[data-pick]{cursor:pointer}
 table.t tr[data-pick]:hover td{background:var(--hover)}
 table.t tr.cur td{background:var(--selfield)}
 table.t tr.mt td{color:var(--faint)}
 table.t tr.sub td.p{padding-left:22px;font-weight:500}
-/* inspector */
 .inspector{position:sticky;top:64px;max-height:calc(100vh - 80px);overflow:auto}
 .ib{padding:12px 14px;border-bottom:1px solid var(--line2)}
 .ib:last-child{border-bottom:0}
@@ -114,6 +121,9 @@ table.t tr.sub td.p{padding-left:22px;font-weight:500}
 .kv{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;font-size:12.5px;margin-top:10px}
 .kv dt{color:var(--muted)}
 .kv dd{margin:0;font-family:var(--mono);word-break:break-word}
+.kv dd.sans{font-family:var(--sans)}
+.ok{color:var(--ok);font-weight:600}
+.nok{color:var(--bad);font-weight:600}
 .qrow{display:flex;gap:6px}
 .qrow input{flex:1;border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--bg);font-family:var(--mono)}
 .qres{margin-top:8px;font-size:12.5px}
@@ -128,7 +138,6 @@ table.t tr.sub td.p{padding-left:22px;font-weight:500}
 .badge.same{background:var(--add);color:var(--text)}
 .badge.del{background:var(--del-strong);color:#3d0000}
 .badge.add{background:var(--add-strong);color:#00290f}
-/* compare */
 .cmp-inputs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media (max-width:800px){.cmp-inputs{grid-template-columns:1fr}}
 .cmpview{font:12.5px/1.7 var(--mono);padding:4px 0}
@@ -173,20 +182,36 @@ table.t tr.sub td.p{padding-left:22px;font-weight:500}
 </head>
 <body>
 <header>
-  <div class="brand"><div class="logo">HL7</div>HL7 Inspector</div>
+  <div class="brand"><div class="logo">HL7</div>HL7 Helper</div>
   <nav class="tabs">
-    <button data-tab="analyze" class="on">Analyse</button>
-    <button data-tab="compare">Vergleich</button>
+    <button data-tab="analyze" class="on" data-i18n="tab_analyze"></button>
+    <button data-tab="compare" data-i18n="tab_compare"></button>
   </nav>
   <div class="hdr-right">
-    <label>Pfad-Notation
-      <select id="notation">
-        <option value="-">OBX-3.2</option>
-        <option value=".">OBX.3.2</option>
-        <option value="">OBX3.2</option>
-      </select>
-    </label>
-    <span class="offline" title="Alles läuft lokal im Browser – keine Daten verlassen den Rechner, nichts wird gespeichert."><i></i>offline · keine Speicherung</span>
+    <div class="lang" role="group" aria-label="Sprache / Language">
+      <button data-lang="de">DE</button>
+      <button data-lang="en">EN</button>
+    </div>
+    <button class="gear" id="gearBtn" data-i18n-title="settings" aria-haspopup="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+  <div id="pop" class="pop hidden">
+    <label for="region" data-i18n="set_region"></label>
+    <select id="region">
+      <option value="auto" data-i18n="reg_auto"></option>
+      <option value="DE" data-i18n="reg_DE"></option>
+      <option value="AT" data-i18n="reg_AT"></option>
+      <option value="CH" data-i18n="reg_CH"></option>
+      <option value="INT" data-i18n="reg_INT"></option>
+    </select>
+    <label for="notation" data-i18n="set_notation"></label>
+    <select id="notation">
+      <option value="-" data-i18n="not_std"></option>
+      <option value="." data-i18n="not_dot"></option>
+      <option value="" data-i18n="not_short"></option>
+    </select>
+    <div class="priv" data-i18n="set_privacy"></div>
   </div>
 </header>
 
@@ -194,15 +219,16 @@ table.t tr.sub td.p{padding-left:22px;font-weight:500}
   <!-- ======================= ANALYSE ======================= -->
   <section id="view-analyze">
     <div class="card">
-      <textarea id="inA" class="hl7in" spellcheck="false" placeholder="HL7-Nachricht hier einfügen (Strg+V) …&#10;&#10;MSH|^~\&|SENDER|…"></textarea>
+      <textarea id="inA" class="hl7in" spellcheck="false" data-i18n-ph="ph_input"></textarea>
       <div class="toolbar">
-        <button class="btn" data-sample="adt">Beispiel ADT^A01</button>
-        <button class="btn" data-sample="oru">Beispiel ORU^R01</button>
-        <button class="btn" id="clearA">Leeren</button>
+        <button class="btn" data-sample="adtDE" data-i18n="sample_adt_de"></button>
+        <button class="btn" data-sample="adtAT" data-i18n="sample_adt_at"></button>
+        <button class="btn" data-sample="oruCH" data-i18n="sample_oru_ch"></button>
+        <button class="btn" id="clearA" data-i18n="clear"></button>
         <select id="msgSel" class="btn hidden"></select>
         <span class="sp-flex"></span>
-        <button class="btn" id="toCompare" title="Diese Nachricht als A in den Vergleich übernehmen">→ in Vergleich (A)</button>
-        <button class="btn" id="copyJson" title="Alle befüllten Felder als JSON (Pfad → Wert) kopieren">JSON kopieren</button>
+        <button class="btn" id="toCompare" data-i18n="to_compare" data-i18n-title="to_compare_t"></button>
+        <button class="btn" id="copyJson" data-i18n="copy_json" data-i18n-title="copy_json_t"></button>
       </div>
     </div>
 
@@ -212,24 +238,25 @@ table.t tr.sub td.p{padding-left:22px;font-weight:500}
       <div class="card">
         <div class="viewhead">
           <div class="seg-toggle">
-            <button data-view="raw" class="on">Nachricht</button>
-            <button data-view="list">Feldliste</button>
+            <button data-view="raw" class="on" data-i18n="view_msg"></button>
+            <button data-view="list" data-i18n="view_table"></button>
           </div>
-          <label class="chk"><input type="checkbox" id="fieldNums"> Feldnummern</label>
+          <label class="versel"><span data-i18n="hl7ver"></span> <select class="verSel"></select></label>
+          <label class="chk"><input type="checkbox" id="fieldNums"> <span data-i18n="field_nums"></span></label>
           <span class="sp-flex"></span>
-          <span class="hint">Hover = Feldname · Klick = Details</span>
+          <span class="hint" data-i18n="hint_hover"></span>
         </div>
         <div id="viewRaw" class="msgview"></div>
         <div id="viewList" class="listwrap hidden">
-          <div style="padding:8px 12px"><input id="listFilter" class="filter" placeholder="Filtern nach Pfad, Name oder Wert … (z.B. PID, Name, 2024)"></div>
+          <div style="padding:8px 12px"><input id="listFilter" class="filter" data-i18n-ph="filter_ph"></div>
           <div id="listBody"></div>
         </div>
       </div>
 
       <aside class="card inspector">
         <div class="ib">
-          <h4>Pfad suchen</h4>
-          <div class="qrow"><input id="query" placeholder="z.B. PID-5.1 · OBX[2]-5 · MSH-9"></div>
+          <h4 data-i18n="search_path"></h4>
+          <div class="qrow"><input id="query" data-i18n-ph="query_ph"></div>
           <div id="qres" class="qres"></div>
         </div>
         <div id="inspBody"></div>
@@ -241,23 +268,24 @@ table.t tr.sub td.p{padding-left:22px;font-weight:500}
   <section id="view-compare" class="hidden">
     <div class="cmp-inputs">
       <div class="card">
-        <div class="lbl">Nachricht A</div>
-        <textarea id="cmpA" class="hl7in" spellcheck="false" placeholder="Nachricht A einfügen …"></textarea>
+        <div class="lbl" data-i18n="msgA"></div>
+        <textarea id="cmpA" class="hl7in" spellcheck="false" data-i18n-ph="phA"></textarea>
       </div>
       <div class="card">
-        <div class="lbl">Nachricht B</div>
-        <textarea id="cmpB" class="hl7in" spellcheck="false" placeholder="Nachricht B einfügen …"></textarea>
+        <div class="lbl" data-i18n="msgB"></div>
+        <textarea id="cmpB" class="hl7in" spellcheck="false" data-i18n-ph="phB"></textarea>
       </div>
     </div>
     <div class="card" style="margin-top:10px">
       <div class="toolbar" style="border-top:0">
-        <button class="btn" id="cmpSample">Beispiel laden</button>
-        <button class="btn" id="cmpSwap">A ⇄ B tauschen</button>
-        <button class="btn" id="cmpClear">Leeren</button>
+        <button class="btn" id="cmpSample" data-i18n="load_sample"></button>
+        <button class="btn" id="cmpSwap" data-i18n="swap"></button>
+        <button class="btn" id="cmpClear" data-i18n="clear"></button>
+        <label class="versel"><span data-i18n="hl7ver"></span> <select class="verSel"></select></label>
         <span class="sp-flex"></span>
-        <label class="chk"><input type="checkbox" id="onlyDiff"> nur Unterschiede</label>
-        <label class="chk"><input type="checkbox" id="ignoreOn"> ignorieren:</label>
-        <input id="ignoreList" class="ignore-in" title="Kommagetrennte Pfade, z.B. MSH-7, MSH-10, EVN-2">
+        <label class="chk"><input type="checkbox" id="onlyDiff"> <span data-i18n="only_diff"></span></label>
+        <label class="chk"><input type="checkbox" id="ignoreOn"> <span data-i18n="ignore"></span></label>
+        <input id="ignoreList" class="ignore-in" data-i18n-title="ignore_t">
       </div>
     </div>
 
@@ -267,12 +295,12 @@ table.t tr.sub td.p{padding-left:22px;font-weight:500}
       <div class="card">
         <div class="viewhead">
           <div class="legend">
-            <span><i style="background:var(--chg-strong)"></i>geändert</span>
-            <span><i style="background:var(--del-strong)"></i>nur in A</span>
-            <span><i style="background:var(--add-strong)"></i>nur in B</span>
+            <span><i style="background:var(--chg-strong)"></i><span data-i18n="changed"></span></span>
+            <span><i style="background:var(--del-strong)"></i><span data-i18n="onlyA"></span></span>
+            <span><i style="background:var(--add-strong)"></i><span data-i18n="onlyB"></span></span>
           </div>
           <span class="sp-flex"></span>
-          <span class="hint">Klick auf ein Feld zeigt beide Werte</span>
+          <span class="hint" data-i18n="hint_cmp"></span>
         </div>
         <div class="cmphead"><div></div><div>A</div><div></div><div>B</div></div>
         <div id="cmpView" class="cmpview"></div>
@@ -290,7 +318,8 @@ table.t tr.sub td.p{padding-left:22px;font-weight:500}
 <script>
 'use strict';
 /* =====================================================================
-   HL7 v2 Definitionen (Auszug v2.5 – häufigste Segmente & Datentypen)
+   HL7 v2 definitions (based on v2.5 – most common segments & data types)
+   Field definitions: 'English name|TYPE' or 'English name|TYPE|Deutscher Name'
    ===================================================================== */
 const SEGS = {}, DT = {}, DTNAME = {};
 function S(id, name, defs){ SEGS[id] = { n:name, f:defs.split(';') }; }
@@ -321,7 +350,6 @@ S('TQ1','Timing/Quantity','Set ID - TQ1|SI;Quantity|CQ;Repeat Pattern|RPT;Explic
 S('SCH','Scheduling Activity Information','Placer Appointment ID|EI;Filler Appointment ID|EI;Occurrence Number|NM;Placer Group Number|EI;Schedule ID|CE;Event Reason|CE;Appointment Reason|CE;Appointment Type|CE;Appointment Duration|NM;Appointment Duration Units|CE;Appointment Timing Quantity|TQ;Placer Contact Person|XCN;Placer Contact Phone Number|XTN;Placer Contact Address|XAD;Placer Contact Location|PL;Filler Contact Person|XCN;Filler Contact Phone Number|XTN;Filler Contact Address|XAD;Filler Contact Location|PL;Entered By Person|XCN;Entered By Phone Number|XTN;Entered By Location|PL;Parent Placer Appointment ID|EI;Parent Filler Appointment ID|EI;Filler Status Code|CE;Placer Order Number|EI;Filler Order Number|EI');
 S('AIS','Appointment Information','Set ID - AIS|SI;Segment Action Code|ID;Universal Service Identifier|CE;Start Date/Time|TS;Start Date/Time Offset|NM;Start Date/Time Offset Units|CE;Duration|NM;Duration Units|CE;Allow Substitution Code|IS;Filler Status Code|CE;Placer Supplemental Service Information|CE;Filler Supplemental Service Information|CE');
 S('FT1','Financial Transaction','Set ID - FT1|SI;Transaction ID|ST;Transaction Batch ID|ST;Transaction Date|DR;Transaction Posting Date|TS;Transaction Type|IS;Transaction Code|CE;Transaction Description|ST;Transaction Description - Alt|ST;Transaction Quantity|NM;Transaction Amount - Extended|CP;Transaction Amount - Unit|CP;Department Code|CE;Insurance Plan ID|CE;Insurance Amount|CP;Assigned Patient Location|PL;Fee Schedule|IS;Patient Type|IS;Diagnosis Code - FT1|CE;Performed By Code|XCN;Ordered By Code|XCN;Unit Cost|CP;Filler Order Number|EI;Entered By Code|XCN;Procedure Code|CE;Procedure Code Modifier|CE');
-S('ZBE','Bewegungsdaten (IHE-D / DE, Z-Segment)','Movement ID|EI;Start Movement Date/Time|TS;End Movement Date/Time|TS;Movement Action|ID;Historical Movement Indicator|ID;Original Trigger Event Code|ID;Responsible Ward|XON');
 
 D('HD','Hierarchic Designator','Namespace ID|IS;Universal ID|ST;Universal ID Type|ID');
 D('TS','Time Stamp','Time|DTM;Degree of Precision|ID');
@@ -371,119 +399,306 @@ D('CP','Composite Price','Price|MO;Price Type|ID;From Value|NM;To Value|NM;Range
 D('ELD','Error Location and Description','Segment ID|ST;Segment Sequence|NM;Field Position|NM;Code Identifying Error|CE');
 D('ERL','Error Location','Segment ID|ST;Segment Sequence|NM;Field Position|NM;Field Repetition|NM;Component Number|NM;Sub-Component Number|NM');
 D('AUI','Authorization Information','Authorization Number|ST;Date|DT;Source|ST');
-[['ST','String'],['NM','Numeric'],['ID','Coded value for HL7 tables'],['IS','Coded value for user-defined tables'],['SI','Sequence ID'],['DT','Date'],['DTM','Date/Time'],['TM','Time'],['TX','Text Data'],['FT','Formatted Text'],['TN','Telephone Number'],['varies','abhängig von OBX-2'],['RPT','Repeat Pattern'],['OSD','Order Sequence Definition']].forEach(([k,v])=>DTNAME[k]=v);
 
-const TABLES = {
-  '0001':{F:'Female (weiblich)',M:'Male (männlich)',O:'Other',U:'Unknown',A:'Ambiguous',N:'Not applicable',D:'Divers',X:'unbestimmt'},
-  '0002':{A:'Separated',D:'Divorced (geschieden)',M:'Married (verheiratet)',S:'Single (ledig)',W:'Widowed (verwitwet)',C:'Common law',G:'Living together',P:'Domestic partner',U:'Unknown'},
-  '0003':{A01:'Admit/visit notification (Aufnahme)',A02:'Transfer a patient (Verlegung)',A03:'Discharge/end visit (Entlassung)',A04:'Register a patient',A05:'Pre-admit a patient',A06:'Change outpatient to inpatient',A07:'Change inpatient to outpatient',A08:'Update patient information',A11:'Cancel admit',A12:'Cancel transfer',A13:'Cancel discharge',A28:'Add person information',A29:'Delete person information',A31:'Update person information',A34:'Merge patient information - patient ID only',A40:'Merge patient - patient identifier list',A47:'Change patient identifier list',O01:'Order message',O21:'Laboratory order',O22:'Lab order acknowledgment',O33:'Lab order for multiple orders',R01:'Unsolicited transmission of an observation',R30:'Unsolicited point-of-care observation',T02:'Original document notification and content',T04:'Document status change notification',T08:'Document edit notification',S12:'Notification of new appointment booking',S14:'Notification of appointment modification',S15:'Notification of appointment cancellation',P03:'Post detail financial transaction',V04:'Unsolicited vaccination record update'},
-  '0004':{E:'Emergency',I:'Inpatient (stationär)',O:'Outpatient (ambulant)',P:'Preadmit',R:'Recurring patient',B:'Obstetrics',C:'Commercial Account',N:'Not Applicable',U:'Unknown'},
-  '0007':{A:'Accident',C:'Elective',E:'Emergency',L:'Labor and Delivery',N:'Newborn',R:'Routine',U:'Urgent'},
-  '0008':{AA:'Application Accept',AE:'Application Error',AR:'Application Reject',CA:'Commit Accept',CE:'Commit Error',CR:'Commit Reject'},
-  '0038':{A:'Some, but not all, results available',CA:'Order was canceled',CM:'Order is completed',DC:'Order was discontinued',ER:'Error, order not found',HD:'Order is on hold',IP:'In process, unspecified',RP:'Order has been replaced',SC:'In process, scheduled'},
-  '0076':{ACK:'General acknowledgment',ADT:'Admit Discharge Transfer',BAR:'Add/change billing account',DFT:'Detail financial transaction',MDM:'Medical document management',MFN:'Master files notification',OML:'Laboratory order',OMG:'General clinical order',ORL:'Lab order response',ORM:'Pharmacy/treatment order',ORR:'Order response',ORU:'Unsolicited observation (Befund)',OUL:'Unsolicited laboratory observation',QRY:'Query',RDE:'Pharmacy/treatment encoded order',RAS:'Pharmacy/treatment administration',SIU:'Schedule information unsolicited',VXU:'Unsolicited vaccination record update'},
-  '0078':{L:'Below low normal',H:'Above high normal',LL:'Below lower panic limits',HH:'Above upper panic limits','<':'Below absolute low-off instrument scale','>':'Above absolute high-off instrument scale',N:'Normal',A:'Abnormal',AA:'Very abnormal',U:'Significant change up',D:'Significant change down',B:'Better',W:'Worse',S:'Susceptible',R:'Resistant',I:'Intermediate',NEG:'Negative',POS:'Positive'},
-  '0085':{C:'Record coming over is a correction',D:'Deletes the OBX record',F:'Final results',I:'Specimen in lab; results pending',N:'Not asked',O:'Order detail description only',P:'Preliminary results',R:'Results entered – not verified',S:'Partial results',X:'Results cannot be obtained',U:'Results status change to final',W:'Post original as wrong'},
-  '0103':{P:'Production',T:'Training',D:'Debugging'},
-  '0119':{NW:'New order',OK:'Order accepted & OK',CA:'Cancel order request',CR:'Canceled as requested',DC:'Discontinue order request',DR:'Discontinued as requested',HD:'Hold order request',SC:'Status changed',SN:'Send order number',RE:'Observations to follow',XO:'Change order request',XX:'Changed as requested',RP:'Order replace request',RU:'Replaced unsolicited',NA:'Number assigned',UA:'Unable to accept order'},
-  '0123':{O:'Order received; specimen not yet received',I:'No results available; specimen received',S:'No results available; procedure scheduled',A:'Some, but not all, results available',P:'Preliminary',C:'Correction to results',R:'Results stored; not yet verified',F:'Final results',X:'No results available; order canceled',Y:'No order on record',Z:'No record of this patient'},
-  '0125':{AD:'Address',CE:'Coded Entry',CF:'Coded Element With Formatted Values',CK:'Composite ID With Check Digit',CN:'Composite ID And Name',CNE:'Coded with No Exceptions',CP:'Composite Price',CWE:'Coded with Exceptions',CX:'Extended Composite ID',DT:'Date',DTM:'Date/Time',ED:'Encapsulated Data',FT:'Formatted Text',MO:'Money',NM:'Numeric',PN:'Person Name',RP:'Reference Pointer',SN:'Structured Numeric',ST:'String Data',TM:'Time',TN:'Telephone Number',TS:'Time Stamp',TX:'Text Data',XAD:'Extended Address',XCN:'Extended Composite Name And Number For Persons',XON:'Extended Composite Name And Number For Organizations',XPN:'Extended Person Name',XTN:'Extended Telecommunications Number'},
-  '0136':{Y:'Yes',N:'No'},
-  '0155':{AL:'Always',NE:'Never',ER:'Error/reject conditions only',SU:'Successful completion only'},
-  '0201':{PRN:'Primary Residence Number',ORN:'Other Residence Number',WPN:'Work Number',VHN:'Vacation Home Number',ASN:'Answering Service Number',EMR:'Emergency Number',NET:'Network (email) address',BPN:'Beeper Number'},
-  '0203':{PI:'Patient internal identifier',MR:'Medical record number',AN:'Account number',VN:'Visit number',SS:'Social Security number',NII:'National Insurance Identifier',PT:'Patient external identifier',NPI:'National provider identifier',DL:'Driver\'s license number',PPN:'Passport number',LANR:'Lebenslange Arztnummer',BSNR:'Betriebsstättennummer'},
-  '0200':{L:'Legal Name',D:'Display Name',M:'Maiden Name',A:'Alias Name',B:'Name at Birth',C:'Adopted Name',N:'Nickname',U:'Unspecified'},
-  '0190':{H:'Home',B:'Firm/Business',M:'Mailing',O:'Office',C:'Current Or Temporary',P:'Permanent',BA:'Bad address',BR:'Residence at birth',L:'Legal Address'}
-};
-const TABLE_MAP = {
-  'MSH-9.1':'0076','MSH-9.2':'0003','MSH-11.1':'0103','MSH-15':'0155','MSH-16':'0155','EVN-1':'0003',
-  'PID-8':'0001','PID-16.1':'0002','PID-3.5':'0203','PID-2.5':'0203','PID-18.5':'0203','PID-5.7':'0200','PID-11.7':'0190','PID-13.2':'0201','PID-14.2':'0201','PID-30':'0136',
-  'NK1-15':'0001','IN1-43':'0001','PV1-2':'0004','PV1-4':'0007','PV1-19.5':'0203','MRG-1.5':'0203',
-  'MSA-1':'0008','OBX-2':'0125','OBX-8':'0078','OBX-11':'0085','OBR-25':'0123','ORC-1':'0119','ORC-5':'0038'
-};
+/* ---------- DACH Z-segments ---------- */
+S('ZBE','Movement (IHE PAM / HL7 Germany)','Movement ID|EI|Bewegungs-ID;Start Movement Date/Time|TS|Zeitpunkt Bewegungsbeginn;End Movement Date/Time|TS|Zeitpunkt Bewegungsende;Movement Action|ID|Aktionscode;Historical Movement Indicator|ID|Kennzeichen historische Bewegung;Original Trigger Event Code|ID|Ursprüngliches Trigger-Event;Responsible Ward|XON|Fachlich zuständige Station;Responsible Nursing Ward|XON|Pflegerisch zuständige Station;Movement Scope|CWE|Bewegungsumfang');
+SEGS.ZBE.de = 'Bewegungsdaten (IHE PAM / HL7 Deutschland / HL7 Austria)';
+S('ZAC','Accident Data (HL7 Austria)','Accident Date/Time|TS|Unfallzeitpunkt;Accident Type|IS|Art des Unfalls;Accident Location|ST|Unfallort;Mode of Arrival|IS|Einlieferungsart;Third-Party Fault|ID|Fremdverschulden;Rescue Service|CE|Rettungsdienst;Accident Description|ST|Beschreibung des Unfalls;Police Notified|ID|Exekutive verständigt');
+SEGS.ZAC.de = 'Unfalldaten (HL7 Austria)';
+S('ZTE','Telecommunication Data (HL7 Austria)','Patient Phone|XTN|Telefon Patient;Patient Phone Change Indicator|ID|Änderungskennzeichen Telefon;Patient Phone Previous Content|XTN|Bisheriger Telefoneintrag');
+SEGS.ZTE.de = 'Daten für Telekommunikationseinrichtungen (HL7 Austria)';
+S('ZNG','Newborn Data (HL7 Austria)','ZNG ID|SI|ZNG-ID;Vital Status|IS|Vitalstatus;Multiple Birth Indicator|ID|Mehrlingskennzeichen;Birth Order|ST|Geburtsrang;Delivery Method|CE|Entbindungsart;Gestational Age|CQ|Gestationsalter;Gestational Age Method|CE|Untersuchungsmethode Gestationsalter;Complication|CE|Komplikation;Length|ST|Größe;Weight|ST|Gewicht');
+SEGS.ZNG.de = 'Neugeborenendaten (HL7 Austria)';
+[['ST','String'],['NM','Numeric'],['ID','Coded value for HL7 tables'],['IS','Coded value for user-defined tables'],['SI','Sequence ID'],['DT','Date'],['DTM','Date/Time'],['TM','Time'],['TX','Text Data'],['FT','Formatted Text'],['TN','Telephone Number'],['RPT','Repeat Pattern'],['OSD','Order Sequence Definition']].forEach(([k,v]) => DTNAME[k] = v);
+
 const HEADER = new Set(['MSH','BHS','FHS']);
+const VERSIONS = ['2.1','2.2','2.3','2.3.1','2.4','2.5','2.5.1','2.6','2.7','2.7.1','2.8','2.8.1','2.8.2','2.9'];
 
 /* =====================================================================
-   Beispielnachrichten
+   Code tables – [Deutsch, English]
+   ===================================================================== */
+const TABLES = {}, TABLES_REGION = { AT:{} };
+function TB(id, obj, region){ (region ? TABLES_REGION[region] : TABLES)[id] = obj; }
+TB('0001',{F:['weiblich','Female'],M:['männlich','Male'],O:['andere','Other'],U:['unbekannt','Unknown'],A:['mehrdeutig','Ambiguous'],N:['nicht zutreffend','Not applicable'],X:['nicht-binär (ab v2.9)','Non-binary (v2.9+)']});
+TB('0001',{M:['männlich','Male'],F:['weiblich','Female'],X:['nicht-binär','Non-binary'],D:['divers','Diverse'],I:['inter','Inter'],O:['offen','Open'],U:['unbekannt','Unknown']},'AT');
+TB('0002',{A:['getrennt lebend','Separated'],D:['geschieden','Divorced'],M:['verheiratet','Married'],S:['ledig','Single'],W:['verwitwet','Widowed'],C:['eheähnliche Gemeinschaft','Common law'],G:['zusammenlebend','Living together'],P:['eingetragene Partnerschaft','Domestic partner'],U:['unbekannt','Unknown']});
+TB('0003',{A01:['Aufnahme','Admit/visit notification'],A02:['Verlegung','Transfer a patient'],A03:['Entlassung','Discharge/end visit'],A04:['Registrierung (ambulant)','Register a patient'],A05:['Voraufnahme','Pre-admit a patient'],A06:['Wechsel ambulant → stationär','Change outpatient to inpatient'],A07:['Wechsel stationär → ambulant','Change inpatient to outpatient'],A08:['Patientendaten aktualisiert','Update patient information'],A11:['Storno Aufnahme','Cancel admit'],A12:['Storno Verlegung','Cancel transfer'],A13:['Storno Entlassung','Cancel discharge'],A28:['Person angelegt','Add person information'],A29:['Person gelöscht','Delete person information'],A31:['Person aktualisiert','Update person information'],A34:['Zusammenführung (nur Patienten-ID)','Merge patient – patient ID only'],A40:['Zusammenführung Patient','Merge patient – identifier list'],A47:['Änderung Patienten-ID','Change patient identifier list'],O01:['Auftrag','Order message'],O21:['Laborauftrag','Laboratory order'],O22:['Bestätigung Laborauftrag','Laboratory order acknowledgment'],O33:['Laborauftrag (mehrere Aufträge)','Laboratory order for multiple orders'],R01:['Befund (unaufgefordert)','Unsolicited transmission of an observation'],R30:['Point-of-Care-Befund','Unsolicited point-of-care observation'],T02:['Neues Dokument mit Inhalt','Original document notification and content'],T04:['Dokumentstatus geändert','Document status change notification'],T08:['Dokument bearbeitet','Document edit notification'],S12:['Termin neu','New appointment booking'],S14:['Termin geändert','Appointment modification'],S15:['Termin storniert','Appointment cancellation'],P03:['Leistungsbuchung','Post detail financial transaction'],V04:['Impfdaten','Unsolicited vaccination record update'],Z99:['Bewegung aktualisiert (IHE PAM)','Update movement (IHE PAM)']});
+TB('0004',{E:['Notfall','Emergency'],I:['stationär','Inpatient'],O:['ambulant','Outpatient'],P:['Voraufnahme','Preadmit'],R:['wiederkehrender Patient','Recurring patient'],B:['Geburtshilfe','Obstetrics'],C:['kommerzielles Konto','Commercial account'],N:['nicht zutreffend','Not applicable'],U:['unbekannt','Unknown']});
+TB('0007',{A:['Unfall','Accident'],C:['elektiv','Elective'],E:['Notfall','Emergency'],L:['Entbindung','Labor and delivery'],N:['Neugeborenes','Newborn'],R:['Routine','Routine'],U:['dringend','Urgent']});
+TB('0008',{AA:['Anwendung akzeptiert','Application accept'],AE:['Anwendungsfehler','Application error'],AR:['Anwendung abgelehnt','Application reject'],CA:['Annahme bestätigt','Commit accept'],CE:['Annahmefehler','Commit error'],CR:['Annahme abgelehnt','Commit reject']});
+TB('0038',{A:['teilweise Ergebnisse','Some results available'],CA:['storniert','Canceled'],CM:['abgeschlossen','Completed'],DC:['abgesetzt','Discontinued'],ER:['Fehler, Auftrag nicht gefunden','Error, order not found'],HD:['angehalten','On hold'],IP:['in Bearbeitung','In process'],RP:['ersetzt','Replaced'],SC:['in Bearbeitung, geplant','In process, scheduled']});
+TB('0076',{ACK:['Quittung','General acknowledgment'],ADT:['Patientenverwaltung','Admit, discharge, transfer'],BAR:['Abrechnungskonto','Add/change billing account'],DFT:['Leistungsdaten','Detail financial transaction'],MDM:['Dokumentenverwaltung','Medical document management'],MFN:['Stammdaten','Master files notification'],OML:['Laborauftrag','Laboratory order'],OMG:['Allgemeiner Auftrag','General clinical order'],ORL:['Antwort Laborauftrag','Laboratory order response'],ORM:['Auftrag','Order message'],ORR:['Antwort Auftrag','Order response'],ORU:['Befund','Unsolicited observation result'],OUL:['Laborbefund','Unsolicited laboratory observation'],QRY:['Abfrage','Query'],RDE:['Medikationsauftrag','Pharmacy/treatment encoded order'],RAS:['Medikamentengabe','Pharmacy/treatment administration'],SIU:['Terminplanung','Scheduling information unsolicited'],VXU:['Impfdaten','Vaccination record update']});
+TB('0078',{L:['unter Normbereich','Below low normal'],H:['über Normbereich','Above high normal'],LL:['unter unterer Alarmgrenze','Below lower panic limit'],HH:['über oberer Alarmgrenze','Above upper panic limit'],'<':['unter Messbereich','Below absolute low'],'>':['über Messbereich','Above absolute high'],N:['normal','Normal'],A:['pathologisch','Abnormal'],AA:['stark pathologisch','Very abnormal'],U:['deutlicher Anstieg','Significant change up'],D:['deutlicher Abfall','Significant change down'],B:['besser','Better'],W:['schlechter','Worse'],S:['sensibel','Susceptible'],R:['resistent','Resistant'],I:['intermediär','Intermediate'],NEG:['negativ','Negative'],POS:['positiv','Positive']});
+TB('0085',{C:['Korrektur','Correction'],D:['Löschung','Delete'],F:['endgültig','Final'],I:['Probe im Labor, Ergebnis ausstehend','Specimen in lab; results pending'],N:['nicht angefordert','Not asked'],O:['nur Auftragsbeschreibung','Order detail only'],P:['vorläufig','Preliminary'],R:['erfasst, nicht validiert','Entered – not verified'],S:['Teilergebnis','Partial'],X:['nicht ermittelbar','Cannot be obtained'],U:['Status auf endgültig geändert','Changed to final'],W:['als falsch markiert','Post original as wrong']});
+TB('0103',{P:['Produktion','Production'],T:['Schulung/Test','Training'],D:['Debugging','Debugging']});
+TB('0119',{NW:['neuer Auftrag','New order'],OK:['Auftrag angenommen','Order accepted'],CA:['Stornoanfrage','Cancel order request'],CR:['wie angefordert storniert','Canceled as requested'],DC:['Absetzen angefordert','Discontinue request'],DR:['wie angefordert abgesetzt','Discontinued as requested'],HD:['Anhalten angefordert','Hold request'],SC:['Status geändert','Status changed'],SN:['Auftragsnummer anfordern','Send order number'],RE:['Befunde folgen','Observations to follow'],XO:['Änderungsanfrage','Change order request'],XX:['wie angefordert geändert','Changed as requested'],RP:['Ersetzungsanfrage','Order replace request'],RU:['unaufgefordert ersetzt','Replaced unsolicited'],NA:['Nummer vergeben','Number assigned'],UA:['Auftrag nicht annehmbar','Unable to accept order']});
+TB('0123',{O:['Auftrag erhalten, Probe ausstehend','Order received; specimen not yet received'],I:['Probe erhalten, keine Ergebnisse','Specimen received; no results'],S:['geplant, keine Ergebnisse','Scheduled; no results'],A:['teilweise Ergebnisse','Some results available'],P:['vorläufig','Preliminary'],C:['Korrektur','Correction'],R:['gespeichert, nicht validiert','Stored; not verified'],F:['endgültig','Final'],X:['storniert, keine Ergebnisse','Order canceled'],Y:['kein Auftrag vorhanden','No order on record'],Z:['kein Patient vorhanden','No record of this patient']});
+TB('0125',Object.fromEntries(['AD:Address','CE:Coded Entry','CF:Coded Element With Formatted Values','CK:Composite ID With Check Digit','CN:Composite ID And Name','CNE:Coded with No Exceptions','CP:Composite Price','CWE:Coded with Exceptions','CX:Extended Composite ID','DT:Date','DTM:Date/Time','ED:Encapsulated Data','FT:Formatted Text','MO:Money','NM:Numeric','PN:Person Name','RP:Reference Pointer','SN:Structured Numeric','ST:String Data','TM:Time','TN:Telephone Number','TS:Time Stamp','TX:Text Data','XAD:Extended Address','XCN:Extended Composite Name And Number For Persons','XON:Extended Composite Name And Number For Organizations','XPN:Extended Person Name','XTN:Extended Telecommunications Number'].map(x => { const [k, v] = x.split(':'); return [k, [v, v]]; })));
+TB('0136',{Y:['ja','Yes'],N:['nein','No']});
+TB('0155',{AL:['immer','Always'],NE:['nie','Never'],ER:['nur bei Fehler','Error/reject only'],SU:['nur bei Erfolg','Successful completion only']});
+TB('0190',{H:['Wohnadresse','Home'],B:['Geschäftsadresse','Firm/business'],M:['Postadresse','Mailing'],O:['Büro','Office'],C:['aktuell/vorübergehend','Current or temporary'],P:['dauerhaft','Permanent'],BA:['ungültige Adresse','Bad address'],BR:['Wohnort bei Geburt','Residence at birth'],L:['amtliche Adresse','Legal address']});
+TB('0200',{L:['amtlicher Name','Legal name'],D:['Anzeigename','Display name'],M:['Mädchenname','Maiden name'],A:['Alias','Alias'],B:['Geburtsname','Name at birth'],C:['Adoptivname','Adopted name'],N:['Spitzname','Nickname'],U:['nicht spezifiziert','Unspecified']});
+TB('0201',{PRN:['privat (Hauptwohnsitz)','Primary residence number'],ORN:['privat (weiterer Wohnsitz)','Other residence number'],WPN:['dienstlich','Work number'],VHN:['Ferienwohnung','Vacation home number'],ASN:['Anrufbeantworter','Answering service'],EMR:['Notfall','Emergency number'],NET:['E-Mail','Network (email) address'],BPN:['Pager','Beeper number']});
+TB('0203',{PI:['Patienten-ID (intern)','Patient internal identifier'],MR:['Krankenaktennummer','Medical record number'],AN:['Kontonummer','Account number'],VN:['Fall-/Besuchsnummer','Visit number'],SS:['Sozialversicherungsnummer','Social security number'],NI:['nationale Personenkennung','National unique individual identifier'],NII:['nationale Versicherungsnummer','National insurance identifier'],PT:['externe Patienten-ID','Patient external identifier'],DL:['Führerscheinnummer','Driver\'s license number'],PPN:['Reisepassnummer','Passport number'],NPI:['National Provider Identifier (US)','National provider identifier'],LANR:['Lebenslange Arztnummer (DE)','Lifelong physician number (DE)'],BSNR:['Betriebsstättennummer (DE)','Practice site number (DE)']});
+TB('0399',{DEU:['Deutschland','Germany'],AUT:['Österreich','Austria'],CHE:['Schweiz','Switzerland'],LIE:['Liechtenstein','Liechtenstein'],LUX:['Luxemburg','Luxembourg']});
+TB('9004',{INSERT:['Anlegen','Insert'],UPDATE:['Aktualisieren','Update'],DELETE:['Löschen','Delete'],CANCEL:['Stornieren','Cancel'],REFERENCE:['Zuordnung anlegen','Create reference'],DEREFERENCE:['Zuordnung löschen','Delete reference']});
+TB('9005',{L:['lebend','Alive'],T:['tot','Dead']});
+const TABLE_SRC = { '9004':'HL7 DE/AT, IHE PAM', '9005':'HL7 Austria' };
+const TABLE_MAP = {
+  'MSH-9.1':'0076','MSH-9.2':'0003','MSH-11.1':'0103','MSH-15':'0155','MSH-16':'0155','MSH-17':'0399','EVN-1':'0003',
+  'PID-8':'0001','PID-16.1':'0002','PID-3.5':'0203','PID-2.5':'0203','PID-18.5':'0203','PID-5.7':'0200','PID-11.7':'0190','PID-13.2':'0201','PID-14.2':'0201','PID-30':'0136',
+  'NK1-15':'0001','IN1-43':'0001','PV1-2':'0004','PV1-4':'0007','PV1-19.5':'0203','MRG-1.5':'0203',
+  'MSA-1':'0008','OBX-2':'0125','OBX-8':'0078','OBX-11':'0085','OBR-25':'0123','ORC-1':'0119','ORC-5':'0038',
+  'ZBE-4':'9004','ZBE-5':'0136','ZBE-6':'0003','ZAC-5':'0136','ZAC-8':'0136','ZNG-2':'9005','ZNG-3':'0136'
+};
+
+/* =====================================================================
+   National identifiers (DACH) – check digits & OIDs
+   ===================================================================== */
+const digits = s => s.split('').map(Number);
+const xsum = p => p > 9 ? p - 9 : p;                   // cross sum for products ≤ 18
+function chkKVNR(v){                                   // DE: letter→01..26, weights 1-2-1-2…, cross sums, mod 10
+  const m = /^([A-Z])(\d{8})(\d)$/.exec(v); if(!m) return { fmt:false };
+  const s = String(m[1].charCodeAt(0) - 64).padStart(2, '0') + m[2];
+  let sum = 0; for(let i = 0; i < 10; i++) sum += xsum(+s[i] * (i % 2 ? 2 : 1));
+  return { ok: sum % 10 === +m[3], exp: sum % 10 };
+}
+function chkIK(v){                                     // DE: digits 3–8, weights 2-1-2-1-2-1, cross sums, mod 10
+  if(!/^\d{9}$/.test(v)) return { fmt:false };
+  const d = digits(v); let sum = 0; for(let i = 2; i < 8; i++) sum += xsum(d[i] * (i % 2 ? 1 : 2));
+  return { ok: sum % 10 === d[8], exp: sum % 10 };
+}
+function chkLANR(v){                                   // DE: digits 1–6, weights 4-9, 10 − (sum mod 10)
+  if(!/^\d{9}$/.test(v)) return { fmt:false };
+  const d = digits(v); let sum = 0; for(let i = 0; i < 6; i++) sum += d[i] * (i % 2 ? 9 : 4);
+  const c = (10 - sum % 10) % 10; return { ok: c === d[6], exp: c };
+}
+function chkBSNR(v){ return /^\d{9}$/.test(v) ? { ok:true, fmtOnly:true } : { fmt:false }; }
+function chkSVNR(v){                                   // AT: weights 3,7,9,–,5,8,4,2,1,6, mod 11 = 4th digit
+  if(!/^\d{10}$/.test(v)) return { fmt:false };
+  const w = [3,7,9,0,5,8,4,2,1,6]; const d = digits(v);
+  const c = d.reduce((a, x, i) => a + x * w[i], 0) % 11;
+  return c === 10 ? { ok:false, exp:'–' } : { ok: c === d[3], exp: c };
+}
+function chkEAN13(v){                                  // GS1: weights 1-3, 10 − (sum mod 10)
+  if(!/^\d{13}$/.test(v)) return { fmt:false };
+  const d = digits(v); let sum = 0; for(let i = 0; i < 12; i++) sum += d[i] * (i % 2 ? 3 : 1);
+  const c = (10 - sum % 10) % 10; return { ok: c === d[12], exp: c };
+}
+function chkAHV(v){ return /^756\d{10}$/.test(v) ? chkEAN13(v) : { fmt:false }; }
+const IDSYS = {
+  kvnr:   { de:'Krankenversichertennummer (KVNR, DE)', en:'Health insurance number (KVNR, DE)', chk:chkKVNR },
+  kvnr30: { de:'Krankenversichertennummer 30-stellig (DE)', en:'Health insurance number, 30 digits (DE)' },
+  ik:     { de:'Institutionskennzeichen (IK, DE)', en:'Institution code (IK, DE)', chk:chkIK },
+  lanr:   { de:'Lebenslange Arztnummer (LANR, DE)', en:'Lifelong physician number (LANR, DE)', chk:chkLANR },
+  bsnr:   { de:'Betriebsstättennummer (BSNR, DE)', en:'Practice site number (BSNR, DE)', chk:chkBSNR },
+  svnr:   { de:'Sozialversicherungsnummer (AT)', en:'Social security number (AT)', chk:chkSVNR },
+  kanr:   { de:'Krankenanstaltennummer (AT)', en:'Hospital number (KA-Nr, AT)' },
+  ahv:    { de:'AHV-Nummer (AHVN13, CH)', en:'Social security number (AHVN13, CH)', chk:chkAHV },
+  gln:    { de:'Global Location Number (GLN)', en:'Global Location Number (GLN)', chk:chkEAN13 }
+};
+const ID_OID = {
+  '1.2.276.0.76.4.8':'kvnr', '1.2.276.0.76.4.1':'kvnr30', '1.2.276.0.76.4.5':'ik', '1.2.276.0.76.4.16':'lanr', '1.2.276.0.76.4.17':'bsnr',
+  '1.2.40.0.10.1.4.3.1':'svnr', '1.2.40.0.34.4.10':'kanr', '2.16.756.5.32':'ahv', '2.51.1.3':'gln'
+};
+const ID_CODE = { LANR:'lanr', BSNR:'bsnr', KVNR:'kvnr', KVID:'kvnr', IK:'ik', AHV:'ahv', AHVN13:'ahv', NAVS13:'ahv', GLN:'gln' };
+const ID_FIELD_TYPES = new Set(['CX','XCN','XON','EI','CN','CNN']);
+const PLAIN_ID_FIELDS = new Set(['PID-19','IN1-36']);
+
+/* =====================================================================
+   Sample messages (synthetic data)
    ===================================================================== */
 const P = n => '|'.repeat(n);
+const LANR_DR = '123456601^Schmidt^Peter^^^Dr. med.^^^&1.2.276.0.76.4.16&ISO^L^^^LANR';
 const SAMPLES = {
-  adt: [
-    'MSH|^~\\&|KIS|KLINIKUM|LAB|LABOR|20241105143012||ADT^A01^ADT_A01|MSG00001|P|2.5|||AL|NE||8859/1|DE',
+  adtDE: [
+    'MSH|^~\\&|KIS|KLINIKUM|LAB|LABOR|20241105143012||ADT^A01^ADT_A01|MSG00001|P|2.5|||AL|NE|DEU|8859/1|DE',
     'EVN|A01|20241105143000|||OP01^Muster^Max',
-    'PID|1||1234567^^^KLINIKUM^PI~987654321^^^GKV^SS||Mustermann^Erika^Maria^^Dr.^^L||19750412|F|||Hauptstraße 12^^Berlin^^10115^DE^H||030 1234567^PRN^PH~^NET^Internet^erika@example.de||ger^German^ISO639|M||98765432^^^KLINIKUM^AN',
-    'NK1|1|Mustermann^Hans|SPO^Ehepartner^HL70063|Hauptstraße 12^^Berlin^^10115^DE|030 7654321',
-    'PV1|1|I|STA3^Z301^B1^KLINIKUM||||1234^Schmidt^Peter^^^Dr. med.|||INN||||1|||1234^Schmidt^Peter^^^Dr. med.||5550001^^^KLINIKUM^VN'+P(25)+'20241105142500',
-    'IN1|1|AOK^AOK Nordost||AOK Nordost^^109519005',
-    'ZBE|MOV12345^KIS|20241105142500||INSERT|N'
+    'PID|1||1234567^^^KLINIKUM^PI~A123456780^^^&1.2.276.0.76.4.8&ISO^NII||Mustermann^Erika^Maria^^Dr.^^L||19750412|F|||Musterstraße 12^^Berlin^^10115^DEU^H||030 1234567^PRN^PH~^NET^Internet^erika@example.de||ger^German^ISO639|M||98765432^^^KLINIKUM^AN',
+    'NK1|1|Mustermann^Hans|SPO^Ehepartner^HL70063|Musterstraße 12^^Berlin^^10115^DEU|030 7654321',
+    'PV1|1|I|STA3^Z301^B1^KLINIKUM||||' + LANR_DR + '|||INN||||1|||' + LANR_DR + '||5550001^^^KLINIKUM^VN' + P(25) + '20241105142500',
+    'ZBE|MOV12345^KIS|20241105142500||INSERT|N',
+    'IN1|1|MK^Musterkasse|109999994^^^&1.2.276.0.76.4.5&ISO|Musterkasse'
   ].join('\r'),
-  oru: [
-    'MSH|^~\\&|LIS|LABOR|KIS|KLINIKUM|20241105161544||ORU^R01^ORU_R01|LAB-778812|P|2.5|||AL|NE||UNICODE UTF-8|DE',
-    'PID|1||1234567^^^KLINIKUM^PI||Mustermann^Erika^^^^^L||19750412|F',
-    'PV1|1|I|STA3^Z301^B1^KLINIKUM'+P(16)+'5550001^^^KLINIKUM^VN',
+  adtAT: [
+    'MSH|^~\\&|KIS|LKH|LIS|LABOR|20241112091500||ADT^A01^ADT_A01|AT-000123|P|2.5|||AL|NE|AUT|8859/1|DE',
+    'EVN|A01|20241112091400',
+    'PID|1||778899^^^LKH^PI~1237010180^^^&1.2.40.0.10.1.4.3.1&ISO^SS||Musterfrau^Alex^^^^^L||19800101|D|||Hauptplatz 1^^Graz^^8010^AUT^H',
+    'PV1|1|I|CHI2^201^1^LKH|E|||9001^Huber^Anna^^^Dr.|||CHI||||7|||9001^Huber^Anna^^^Dr.||2024000456^^^LKH^VN' + P(25) + '20241112091000',
+    'ZBE|MOV-9876^KIS|20241112091000||INSERT',
+    'ZAC|20241112080000||Skipiste|||Rettungswagen|Sturz beim Skifahren|N'
+  ].join('\r'),
+  oruCH: [
+    'MSH|^~\\&|LIS|LABOR|KIS|SPITAL|20241105161544||ORU^R01^ORU_R01|LAB-778812|P|2.5|||AL|NE|CHE|UNICODE UTF-8|DE',
+    'PID|1||1234567^^^SPITAL^PI~7561234567897^^^&2.16.756.5.32&ISO^NI||Muster^Erika^^^^^L||19750412|F',
+    'PV1|1|I|MED3^Z301^B1^SPITAL' + P(16) + '5550001^^^SPITAL^VN',
     'ORC|RE|ORD-4711^KIS|LAB-0815^LIS||CM',
-    'OBR|1|ORD-4711^KIS|LAB-0815^LIS|BB^Blutbild^L|||20241105120000|||||||20241105123000||1234^Schmidt^Peter^^^Dr. med.||||||20241105161500|||F',
+    'OBR|1|ORD-4711^KIS|LAB-0815^LIS|BB^Blutbild^L|||20241105120000|||||||20241105123000||7601000000002^Schmidt^Peter^^^Dr. med.^^^&2.51.1.3&ISO^L^^^GLN||||||20241105161500|||F',
     'OBX|1|NM|718-7^Hämoglobin^LN||13.8|g/dl^g/dl^UCUM|12.0-16.0|N|||F|||20241105160000',
     'OBX|2|NM|6690-2^Leukozyten^LN||11.2|10*3/ul^Tsd/µl^UCUM|4.0-10.0|H|||F|||20241105160000',
     'OBX|3|NM|777-3^Thrombozyten^LN||245|10*3/ul^Tsd/µl^UCUM|150-400|N|||F|||20241105160000',
-    'OBX|4|ST|BEM^Bemerkung^L||Probe leicht hämolytisch\\.br\\Bitte Kontrolle'+P(6)+'F',
+    'OBX|4|ST|BEM^Bemerkung^L||Probe leicht hämolytisch\\.br\\Bitte Kontrolle' + P(6) + 'F',
     'NTE|1|L|Befund telefonisch übermittelt an Station 3'
   ].join('\r')
 };
-SAMPLES.oruB = [
-  'MSH|^~\\&|LIS|LABOR|KIS|KLINIKUM|20241106081203||ORU^R01^ORU_R01|LAB-779020|P|2.5|||AL|NE||UNICODE UTF-8|DE',
-  'PID|1||1234567^^^KLINIKUM^PI||Mustermann^Erika^^^^^L||19750412|F',
-  'PV1|1|I|STA4^Z410^B2^KLINIKUM'+P(16)+'5550001^^^KLINIKUM^VN',
+SAMPLES.oruCH_B = [
+  'MSH|^~\\&|LIS|LABOR|KIS|SPITAL|20241106081203||ORU^R01^ORU_R01|LAB-779020|P|2.5|||AL|NE|CHE|UNICODE UTF-8|DE',
+  'PID|1||1234567^^^SPITAL^PI~7561234567897^^^&2.16.756.5.32&ISO^NI||Muster^Erika^^^^^L||19750412|F',
+  'PV1|1|I|MED4^Z410^B2^SPITAL' + P(16) + '5550001^^^SPITAL^VN',
   'ORC|RE|ORD-4711^KIS|LAB-0815^LIS||CM',
-  'OBR|1|ORD-4711^KIS|LAB-0815^LIS|BB^Blutbild^L|||20241105120000|||||||20241105123000||1234^Schmidt^Peter^^^Dr. med.||||||20241106081000|||C',
+  'OBR|1|ORD-4711^KIS|LAB-0815^LIS|BB^Blutbild^L|||20241105120000|||||||20241105123000||7601000000002^Schmidt^Peter^^^Dr. med.^^^&2.51.1.3&ISO^L^^^GLN||||||20241106081000|||C',
   'OBX|1|NM|718-7^Hämoglobin^LN||13.8|g/dl^g/dl^UCUM|12.0-16.0|N|||F|||20241105160000',
   'OBX|2|NM|6690-2^Leukozyten^LN||9.7|10*3/ul^Tsd/µl^UCUM|4.0-10.0|N|||C|||20241106080500',
   'OBX|3|NM|777-3^Thrombozyten^LN||245|10*3/ul^Tsd/µl^UCUM|150-400|N|||F|||20241105160000',
-  'OBX|4|ST|BEM^Bemerkung^L||Probe leicht hämolytisch\\.br\\Bitte Kontrolle'+P(6)+'F',
+  'OBX|4|ST|BEM^Bemerkung^L||Probe leicht hämolytisch\\.br\\Bitte Kontrolle' + P(6) + 'F',
   'OBX|5|NM|1988-5^CRP^LN||4.2|mg/l^mg/l^UCUM|<5.0|N|||F|||20241106080500'
 ].join('\r');
 
 /* =====================================================================
-   Hilfsfunktionen
+   Texts DE / EN
+   ===================================================================== */
+const I18N = {
+de: {
+  tab_analyze:'Analyse', tab_compare:'Vergleich', settings:'Einstellungen',
+  set_region:'Region (Länderregeln)', reg_auto:'Automatisch erkennen', reg_DE:'Deutschland', reg_AT:'Österreich', reg_CH:'Schweiz', reg_INT:'International (ohne Länderregeln)',
+  set_notation:'Pfad-Schreibweise', not_std:'OBX-3.2 (Standard)', not_dot:'OBX.3.2 (Mirth)', not_short:'OBX3.2 (Kurzform)',
+  set_privacy:'Alle Daten bleiben in diesem Browser. Es wird nichts gesendet oder gespeichert.',
+  ph_input:'HL7-Nachricht hier einfügen (Strg+V) …', sample_adt_de:'Beispiel ADT (DE)', sample_adt_at:'Beispiel ADT (AT)', sample_oru_ch:'Beispiel ORU (CH)', clear:'Leeren',
+  to_compare:'→ in Vergleich (A)', to_compare_t:'Diese Nachricht als A in den Vergleich übernehmen', copy_json:'JSON kopieren', copy_json_t:'Alle befüllten Felder als JSON (Pfad → Wert) kopieren',
+  view_msg:'Nachricht', view_table:'Tabelle', field_nums:'Feldnummern', hl7ver:'HL7-Version', ver_auto:'Automatisch', hint_hover:'Hover = Feldname · Klick = Details',
+  filter_ph:'Filtern nach Pfad, Name oder Wert …', search_path:'Pfad suchen', query_ph:'z.B. PID-5.1 · OBX[2]-5 · MSH-9',
+  msgA:'Nachricht A', msgB:'Nachricht B', phA:'Nachricht A einfügen …', phB:'Nachricht B einfügen …', load_sample:'Beispiel laden', swap:'A ⇄ B tauschen',
+  only_diff:'nur Unterschiede', ignore:'ignorieren:', ignore_t:'Kommagetrennte Pfade, z.B. MSH-7, MSH-10, EVN-2', changed:'geändert', onlyA:'nur in A', onlyB:'nur in B', hint_cmp:'Klick auf ein Feld zeigt beide Werte',
+  empty_title:'Noch keine Nachricht', empty_body:'Füge oben eine HL7-v2-Nachricht ein oder lade ein Beispiel.<br><br>Fahre mit der Maus über einen Wert, um den Feldnamen zu sehen – ein Klick zeigt alle Details.',
+  c_type:'Nachrichtentyp', c_version:'HL7-Version', c_ctrl:'Control-ID', c_time:'Zeitpunkt', c_sender:'Sender', c_receiver:'Empfänger', c_proc:'Verarbeitung', c_charset:'Zeichensatz', c_segments:'Segmente', c_region:'Region', c_note:'Hinweis', c_warn:'Warnung', c_ids:'Kennungen',
+  no_msh:'Kein MSH-Segment', no_msh_n:'Standard-Trennzeichen |^~\\& angenommen', bad_lines:'{0} ungültige Zeile(n)', bad_lines_n:'rot unterstrichen',
+  ver_from_msh:'aus MSH-12', ver_manual:'manuell', ver_missing:'MSH-12 leer, angenommen', ver_differs:'MSH-12: {0}',
+  reg_via_msh17:'aus MSH-17', reg_via_msh12:'aus MSH-12', reg_via_oid:'anhand der OIDs', reg_manual:'manuell', reg_none:'nicht erkannt',
+  ids_ok:'{0} geprüft, alle gültig', ids_bad:'{0} mit falscher Prüfziffer',
+  th_path:'Pfad', th_name:'Name', th_value:'Wert', th_type:'Typ', no_results:'Keine Treffer',
+  insp_hint:'Klicke in der Nachricht auf einen Wert – hier erscheinen Pfad (z.B. <code>OBX-3.2</code>), Feldname, Datentyp, Interpretation und der Aufbau des Feldes.<br><br>Klick auf einen <b>Segmentnamen</b> zeigt alle Felder des Segments. <kbd>Esc</kbd> hebt die Auswahl auf.',
+  copy_path:'Pfad kopieren', copy_value:'Wert kopieren', unique:'eindeutig:', value:'Wert', empty:'(leer)', decoded:'Dekodiert (Escape-Sequenzen):',
+  dtype:'Datentyp', datetime:'Datum/Zeit', table:'HL7-Tabelle {0}', not_in_table:'nicht in Tabelle', length:'Länge', chars:'{0} Zeichen', reps:'Wiederholungen', shown:'angezeigt: {0}',
+  position:'Position', line:'Zeile {0}', occ_of:'{0} #{1} von {2}', ver_def:'Definition', ver_def_v:'HL7 v{0}',
+  id_label:'Kennung', id_valid:'✓ Prüfziffer gültig', id_invalid:'✗ Prüfziffer falsch (erwartet {0})', id_format:'✗ Format ungültig', id_fmt_ok:'✓ Format gültig (ohne Prüfziffer)',
+  id_via_oid:'erkannt über OID {0}', id_via_code:'erkannt über Typ „{0}“', id_via_fmt:'erkannt am Format',
+  download_ed:'Eingebettete Datei herunterladen ({0})', not_b64:'Daten sind kein gültiges Base64',
+  structure:'Aufbau {0}', hide_empty:'leere ausblenden', repetition:'Wiederholung {0}', seg_all:'Segment {0} – alle Felder',
+  field_undef:'Feld {0} (nicht definiert)', comp_n:'Komponente {0}', sub_n:'Subkomponente {0}', zfield:'Z-Feld', field_n:'Feld {0}',
+  seg_z:'Z-Segment (benutzerdefiniert)', seg_unknown:'Segment ohne hinterlegte Definition', varies:'abhängig von OBX-2',
+  q_hint:'Schreibweise: <code>SEG[n]-Feld[Wdh].Komp.Sub</code> – Trenner <code>-</code>, <code>.</code> oder keiner.', q_bad:'Unbekanntes Format. Beispiele: <code>PID-5.1</code>, <code>OBX[2]-5</code>, <code>MSH9.2</code>', q_none:'Kein Segment <b>{0}</b> in der Nachricht.',
+  copied:'Kopiert', copied_x:'Kopiert: {0}', copy_fail:'Kopieren nicht möglich', json_n:'{0} Felder als JSON', n_diffs:'{0} Unterschiede', value_lbl:'Wert',
+  cmp_empty_t:'Zwei Nachrichten einfügen', cmp_empty_b:'A links, B rechts – der Vergleich startet automatisch.<br>Segmente werden sinnvoll zugeordnet (auch bei eingefügten oder fehlenden Segmenten), Unterschiede werden bis auf Komponenten-Ebene markiert.',
+  c_result:'Ergebnis', identical:'Identisch', ignored:'ignoriert: {0}', c_diffs:'Unterschiede', diffs_in:'Werte in {0} Segment(en)', c_onlyA:'Nur in A', c_onlyB:'Nur in B', segs_n:'Segment(e)', c_typ:'Typ',
+  cmp_insp_hint:'Hier erscheinen die Liste aller Unterschiede und – nach einem Klick – die Werte aus A und B nebeneinander.',
+  seg_onlyB:'Segment nur in B', seg_onlyA:'Segment nur in A', same:'gleich', chg:'geändert', chg_ign:'geändert (ignoriert)', values:'Werte', seg_missing:'(Segment fehlt)',
+  a_date:'A Datum', b_date:'B Datum', whole_field:'Gesamtes Feld {0}:', diffs_title:'Unterschiede ({0})', copy_text:'als Text kopieren', no_diffs:'Keine Unterschiede', more_n:'… und {0} weitere',
+  invalid_line:'Keine gültige Segmentzeile', more_chars:'…[+{0} Zeichen]', msg_n:'Nachricht {0}/{1}', only_in_A:'nur in A', only_in_B:'nur in B', ver_mismatch:'A: {0} · B: {1}', uhr:' Uhr'
+},
+en: {
+  tab_analyze:'Analyze', tab_compare:'Compare', settings:'Settings',
+  set_region:'Region (country rules)', reg_auto:'Detect automatically', reg_DE:'Germany', reg_AT:'Austria', reg_CH:'Switzerland', reg_INT:'International (no country rules)',
+  set_notation:'Path notation', not_std:'OBX-3.2 (standard)', not_dot:'OBX.3.2 (Mirth)', not_short:'OBX3.2 (short form)',
+  set_privacy:'All data stays in this browser. Nothing is sent or stored.',
+  ph_input:'Paste an HL7 message here (Ctrl+V) …', sample_adt_de:'Sample ADT (DE)', sample_adt_at:'Sample ADT (AT)', sample_oru_ch:'Sample ORU (CH)', clear:'Clear',
+  to_compare:'→ to Compare (A)', to_compare_t:'Use this message as A in Compare', copy_json:'Copy JSON', copy_json_t:'Copy all populated fields as JSON (path → value)',
+  view_msg:'Message', view_table:'Table', field_nums:'Field numbers', hl7ver:'HL7 version', ver_auto:'Automatic', hint_hover:'Hover = field name · Click = details',
+  filter_ph:'Filter by path, name or value …', search_path:'Find path', query_ph:'e.g. PID-5.1 · OBX[2]-5 · MSH-9',
+  msgA:'Message A', msgB:'Message B', phA:'Paste message A …', phB:'Paste message B …', load_sample:'Load sample', swap:'Swap A ⇄ B',
+  only_diff:'differences only', ignore:'ignore:', ignore_t:'Comma-separated paths, e.g. MSH-7, MSH-10, EVN-2', changed:'changed', onlyA:'only in A', onlyB:'only in B', hint_cmp:'Click a field to see both values',
+  empty_title:'No message yet', empty_body:'Paste an HL7 v2 message above or load a sample.<br><br>Hover over a value to see the field name – click it for all details.',
+  c_type:'Message type', c_version:'HL7 version', c_ctrl:'Control ID', c_time:'Timestamp', c_sender:'Sender', c_receiver:'Receiver', c_proc:'Processing', c_charset:'Character set', c_segments:'Segments', c_region:'Region', c_note:'Note', c_warn:'Warning', c_ids:'Identifiers',
+  no_msh:'No MSH segment', no_msh_n:'default delimiters |^~\\& assumed', bad_lines:'{0} invalid line(s)', bad_lines_n:'underlined in red',
+  ver_from_msh:'from MSH-12', ver_manual:'manual', ver_missing:'MSH-12 empty, assumed', ver_differs:'MSH-12: {0}',
+  reg_via_msh17:'from MSH-17', reg_via_msh12:'from MSH-12', reg_via_oid:'from OIDs', reg_manual:'manual', reg_none:'not detected',
+  ids_ok:'{0} checked, all valid', ids_bad:'{0} with wrong check digit',
+  th_path:'Path', th_name:'Name', th_value:'Value', th_type:'Type', no_results:'No matches',
+  insp_hint:'Click a value in the message – this panel shows its path (e.g. <code>OBX-3.2</code>), field name, data type, interpretation and the structure of the field.<br><br>Click a <b>segment name</b> to see all fields of that segment. <kbd>Esc</kbd> clears the selection.',
+  copy_path:'Copy path', copy_value:'Copy value', unique:'unique:', value:'Value', empty:'(empty)', decoded:'Decoded (escape sequences):',
+  dtype:'Data type', datetime:'Date/time', table:'HL7 table {0}', not_in_table:'not in table', length:'Length', chars:'{0} characters', reps:'Repetitions', shown:'shown: {0}',
+  position:'Position', line:'Line {0}', occ_of:'{0} #{1} of {2}', ver_def:'Definition', ver_def_v:'HL7 v{0}',
+  id_label:'Identifier', id_valid:'✓ check digit valid', id_invalid:'✗ wrong check digit (expected {0})', id_format:'✗ invalid format', id_fmt_ok:'✓ format valid (no check digit)',
+  id_via_oid:'detected via OID {0}', id_via_code:'detected via type “{0}”', id_via_fmt:'detected by format',
+  download_ed:'Download embedded file ({0})', not_b64:'Data is not valid Base64',
+  structure:'Structure {0}', hide_empty:'hide empty', repetition:'Repetition {0}', seg_all:'Segment {0} – all fields',
+  field_undef:'Field {0} (not defined)', comp_n:'Component {0}', sub_n:'Subcomponent {0}', zfield:'Z field', field_n:'Field {0}',
+  seg_z:'Z segment (user-defined)', seg_unknown:'Segment without definition', varies:'depends on OBX-2',
+  q_hint:'Notation: <code>SEG[n]-Field[Rep].Comp.Sub</code> – separator <code>-</code>, <code>.</code> or none.', q_bad:'Unknown format. Examples: <code>PID-5.1</code>, <code>OBX[2]-5</code>, <code>MSH9.2</code>', q_none:'No <b>{0}</b> segment in the message.',
+  copied:'Copied', copied_x:'Copied: {0}', copy_fail:'Copy not possible', json_n:'{0} fields as JSON', n_diffs:'{0} differences', value_lbl:'Value',
+  cmp_empty_t:'Paste two messages', cmp_empty_b:'A on the left, B on the right – the comparison starts automatically.<br>Segments are matched sensibly (even with inserted or missing segments), differences are marked down to the component level.',
+  c_result:'Result', identical:'Identical', ignored:'ignored: {0}', c_diffs:'Differences', diffs_in:'values in {0} segment(s)', c_onlyA:'Only in A', c_onlyB:'Only in B', segs_n:'segment(s)', c_typ:'Type',
+  cmp_insp_hint:'This panel lists all differences and – after a click – shows the values from A and B side by side.',
+  seg_onlyB:'Segment only in B', seg_onlyA:'Segment only in A', same:'equal', chg:'changed', chg_ign:'changed (ignored)', values:'Values', seg_missing:'(segment missing)',
+  a_date:'A date', b_date:'B date', whole_field:'Whole field {0}:', diffs_title:'Differences ({0})', copy_text:'copy as text', no_diffs:'No differences', more_n:'… and {0} more',
+  invalid_line:'Not a valid segment line', more_chars:'…[+{0} chars]', msg_n:'Message {0}/{1}', only_in_A:'only in A', only_in_B:'only in B', ver_mismatch:'A: {0} · B: {1}', uhr:''
+}};
+
+/* =====================================================================
+   Helpers
    ===================================================================== */
 const $ = (s, el=document) => el.querySelector(s);
 const $$ = (s, el=document) => Array.from(el.querySelectorAll(s));
 const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const rx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const splitDef = s => { if(!s) return null; const [name,type] = s.split('|'); return {name, type}; };
 const LONG = 300;
 
-const settings = { notation:'-', fieldNums:false, hideEmpty:true, onlyDiff:false, ignoreOn:true, ignore:'MSH-7, MSH-10' };
-function loadSettings(){ try{ Object.assign(settings, JSON.parse(localStorage.getItem('hl7insp.settings')||'{}')); }catch(e){} }
-function saveSettings(){ try{ localStorage.setItem('hl7insp.settings', JSON.stringify(settings)); }catch(e){} }
+const settings = {
+  lang: (navigator.language || 'de').toLowerCase().startsWith('de') ? 'de' : 'en',
+  notation:'-', region:'auto', version:'auto', fieldNums:true, hideEmpty:true, onlyDiff:false, ignoreOn:true, ignore:'MSH-7, MSH-10'
+};
+const SKEY = 'hl7helper.settings.v2';
+function loadSettings(){ try{ Object.assign(settings, JSON.parse(localStorage.getItem(SKEY) || '{}')); }catch(e){} }
+function saveSettings(){ try{ localStorage.setItem(SKEY, JSON.stringify(settings)); }catch(e){} }
 
-function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),1600); }
+function t(key, ...args){
+  let s = (I18N[settings.lang] || I18N.de)[key];
+  if(s == null) s = I18N.de[key] ?? key;
+  args.forEach((a, i) => { s = s.split('{' + i + '}').join(a); });
+  return s;
+}
+const L = pair => Array.isArray(pair) ? (settings.lang === 'de' ? pair[0] : pair[1]) : pair;
+function splitDef(s){
+  if(!s) return null;
+  const [name, type, de] = s.split('|');
+  return { name: settings.lang === 'de' && de ? de : name, type };
+}
+function segDesc(name){
+  const sd = SEGS[name];
+  if(sd) return settings.lang === 'de' && sd.de ? sd.de : sd.n;
+  return name[0] === 'Z' ? t('seg_z') : t('seg_unknown');
+}
+function dtName(type){ return type === 'varies' ? t('varies') : (DTNAME[type] || ''); }
+
+function applyStatic(){
+  document.documentElement.lang = settings.lang;
+  $$('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
+  $$('[data-i18n-ph]').forEach(e => { e.placeholder = t(e.dataset.i18nPh); });
+  $$('[data-i18n-title]').forEach(e => { e.title = t(e.dataset.i18nTitle); });
+  $$('.lang button').forEach(b => b.classList.toggle('on', b.dataset.lang === settings.lang));
+}
+
+function toast(msg){ const el = $('#toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('on'), 1600); }
 function copy(text, label){
-  const done=()=>toast(label ? 'Kopiert: '+label : 'Kopiert');
-  const fallback=()=>{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); done();}catch(e){toast('Kopieren nicht möglich');} ta.remove(); };
-  if(navigator.clipboard && window.isSecureContext !== false){ navigator.clipboard.writeText(text).then(done, fallback); } else fallback();
+  const done = () => toast(label ? t('copied_x', label) : t('copied'));
+  const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); done(); }catch(e){ toast(t('copy_fail')); } ta.remove(); };
+  if(navigator.clipboard && window.isSecureContext !== false) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
 }
 
 /* =====================================================================
    Parser
    ===================================================================== */
 function splitMessages(text){
-  text = (text||'').replace(/[\x0b\x1c]/g, '');
+  text = (text || '').replace(/[\x0b\x1c]/g, '');
   const lines = text.split(/\r\n|\n|\r/).map(l => l.replace(/^\s+/, '').replace(/\s+$/, '')).filter(l => l !== '');
   const msgs = []; let cur = [];
-  for(const l of lines){
-    if(/^MSH/.test(l) && cur.length){ msgs.push(cur); cur = []; }
-    cur.push(l);
-  }
+  for(const l of lines){ if(/^MSH/.test(l) && cur.length){ msgs.push(cur); cur = []; } cur.push(l); }
   if(cur.length) msgs.push(cur);
   return msgs.map(parseMessage);
 }
-
 function parseField(raw, enc){
   return { raw, reps: raw.split(enc.r).map(rr => ({ raw: rr, comps: rr.split(enc.c).map(cc => ({ raw: cc, subs: cc.split(enc.s) })) })) };
 }
 function single(raw){ return { raw, special:true, reps:[{ raw, comps:[{ raw, subs:[raw] }] }] }; }
-
 function parseMessage(lines){
   const enc = { f:'|', c:'^', r:'~', e:'\\', s:'&' };
   const hdr = lines.find(l => /^(MSH|FHS|BHS)/.test(l));
@@ -492,27 +707,23 @@ function parseMessage(lines){
     const p = hdr.split(enc.f)[1] || '';
     if(p[0]) enc.c = p[0]; if(p[1]) enc.r = p[1]; if(p[2]) enc.e = p[2]; if(p[3]) enc.s = p[3];
   }
-  const segs = [], counts = {};
+  const msg = { segs:[], enc, counts:{} };
   lines.forEach(line => {
-    const name = line.slice(0,3);
+    const name = line.slice(0, 3);
     const valid = /^[A-Z][A-Z0-9]{2}$/.test(name) && (line.length === 3 || line[3] === enc.f);
-    if(!valid){ segs.push({ name:'???', invalid:true, line, fields:[], occ:0 }); return; }
-    counts[name] = (counts[name]||0) + 1;
+    if(!valid){ msg.segs.push({ name:'???', invalid:true, line, fields:[], occ:0, msg }); return; }
+    msg.counts[name] = (msg.counts[name] || 0) + 1;
     const parts = line.split(enc.f);
     const fields = [null];
     if(HEADER.has(name)){
-      fields[1] = single(enc.f);
-      fields[2] = single(parts[1] || '');
+      fields[1] = single(enc.f); fields[2] = single(parts[1] || '');
       for(let n = 2; n < parts.length; n++) fields[n+1] = parseField(parts[n], enc);
-    } else {
-      for(let n = 1; n < parts.length; n++) fields[n] = parseField(parts[n], enc);
-    }
-    segs.push({ name, fields, occ: counts[name], line });
+    } else for(let n = 1; n < parts.length; n++) fields[n] = parseField(parts[n], enc);
+    msg.segs.push({ name, fields, occ: msg.counts[name], line, msg });
   });
-  segs.forEach(s => s.multi = (counts[s.name]||0) > 1);
-  return { segs, enc, counts };
+  msg.segs.forEach(s => s.multi = (msg.counts[s.name] || 0) > 1);
+  return msg;
 }
-
 function getVal(seg, f, r, c, s){
   const fd = seg && seg.fields[f]; if(!fd) return '';
   if(r == null) return fd.raw;
@@ -522,76 +733,100 @@ function getVal(seg, f, r, c, s){
   if(s == null) return cp.raw;
   return cp.subs[s-1] ?? '';
 }
-
 function decodeEsc(v, enc){
   const e = enc.e; if(!e || v.indexOf(e) < 0) return v;
   const re = new RegExp(rx(e) + '([^' + rx(e) + ']*)' + rx(e), 'g');
   return v.replace(re, (m, code) => {
-    switch(code){
-      case 'F': return enc.f; case 'S': return enc.c; case 'T': return enc.s; case 'R': return enc.r; case 'E': return e;
-      case '.br': return '\n'; case 'H': case 'N': return '';
-    }
-    if(/^X([0-9A-Fa-f]{2})+$/.test(code)){
-      try{ const bytes = new Uint8Array(code.slice(1).match(/../g).map(h => parseInt(h,16))); return new TextDecoder().decode(bytes); }catch(err){ return m; }
-    }
+    switch(code){ case 'F': return enc.f; case 'S': return enc.c; case 'T': return enc.s; case 'R': return enc.r; case 'E': return e; case '.br': return '\n'; case 'H': case 'N': return ''; }
+    if(/^X([0-9A-Fa-f]{2})+$/.test(code)){ try{ return new TextDecoder().decode(new Uint8Array(code.slice(1).match(/../g).map(h => parseInt(h, 16)))); }catch(err){ return m; } }
     if(/^\.sp\d*$/.test(code)) return '\n';
     if(/^\.(in|ti|ce|fi|nf|sk)/.test(code)) return '';
     return m;
   });
 }
-
 function fmtDate(v){
-  const m = /^(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?(?:\.(\d{1,4}))?([+-]\d{4})?$/.exec((v||'').trim());
+  const m = /^(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?(?:\.(\d{1,4}))?([+-]\d{4})?$/.exec((v || '').trim());
   if(!m) return null;
   const [, Y, M, D, h, mi, s, fr, tz] = m;
   if(M && (+M < 1 || +M > 12)) return null;
   if(D && (+D < 1 || +D > 31)) return null;
   if(h && +h > 23) return null;
-  let out = (D ? D + '.' : '') + (M ? M + '.' : '') + Y;
-  if(h) out += ' ' + h + ':' + (mi || '00') + (s ? ':' + s : '') + (fr ? '.' + fr : '') + ' Uhr';
-  if(tz) out += ' (UTC' + tz.slice(0,3) + ':' + tz.slice(3) + ')';
+  let out = settings.lang === 'de' ? (D ? D + '.' : '') + (M ? M + '.' : '') + Y : Y + (M ? '-' + M : '') + (D ? '-' + D : '');
+  if(h) out += ' ' + h + ':' + (mi || '00') + (s ? ':' + s : '') + (fr ? '.' + fr : '') + t('uhr');
+  if(tz) out += ' (UTC' + tz.slice(0, 3) + ':' + tz.slice(3) + ')';
   return out;
 }
 
-/* Feld-/Komponenten-Beschreibung */
+/* =====================================================================
+   Version & region
+   ===================================================================== */
+function mshOf(msg){ return msg && msg.segs.find(s => s.name === 'MSH'); }
+function detectedVersion(msg){ const msh = mshOf(msg); return msh ? getVal(msh, 12, 1, 1, null).trim() : ''; }
+function verOf(msg){ return settings.version !== 'auto' ? settings.version : (detectedVersion(msg) || '2.5'); }
+function verNum(v){ const p = String(v).split('.').map(x => parseInt(x, 10) || 0); return (p[0] || 0) * 100 + (p[1] || 0) * 10 + (p[2] || 0); }
+function mapType(type, ver){
+  if(!type) return type;
+  const n = verNum(ver);
+  if(n >= 260 && type === 'CE') return 'CWE';     // v2.6+: CE largely replaced by CWE
+  if(n >= 270 && type === 'TS') return 'DTM';     // v2.7+: TS withdrawn, DTM used directly
+  return type;
+}
+const REGION_CODES = { DEU:'DE', DE:'DE', D:'DE', AUT:'AT', AT:'AT', A:'AT', CHE:'CH', CH:'CH', LIE:'CH' };
+function regionOf(msg){
+  if(settings.region !== 'auto') return { code: settings.region === 'INT' ? null : settings.region, via:'manual' };
+  if(!msg) return { code:null, via:'none' };
+  const msh = mshOf(msg);
+  if(msh){
+    const c17 = REGION_CODES[getVal(msh, 17, 1, 1, null).trim().toUpperCase()];
+    if(c17) return { code:c17, via:'msh17' };
+    const c12 = REGION_CODES[getVal(msh, 12, 1, 2, 1).trim().toUpperCase()];
+    if(c12) return { code:c12, via:'msh12' };
+  }
+  const all = msg.segs.map(s => s.line).join('\n');
+  if(all.includes('1.2.276.0.')) return { code:'DE', via:'oid' };
+  if(all.includes('1.2.40.0.')) return { code:'AT', via:'oid' };
+  if(all.includes('2.16.756.') || all.includes('1.2.756.')) return { code:'CH', via:'oid' };
+  return { code:null, via:'none' };
+}
+
+/* Field / component description */
 function describe(seg, f, c, s){
+  const ver = verOf(seg.msg);
+  const out = { segDesc: segDesc(seg.name) };
   const sd = SEGS[seg.name];
-  const out = { segDesc: sd ? sd.n : (seg.name[0] === 'Z' ? 'Z-Segment (benutzerdefiniert)' : 'Segment ohne hinterlegte Definition') };
   let fd = sd && sd.f[f-1] ? splitDef(sd.f[f-1]) : null;
-  if(fd && seg.name === 'OBX' && f === 5){ const vt = getVal(seg,2,1,1,1).trim(); if(vt) fd = { ...fd, type: vt }; }
+  if(fd){
+    fd.type = mapType(fd.type, ver);
+    if(seg.name === 'OBX' && f === 5){ const vt = getVal(seg, 2, 1, 1, 1).trim(); if(vt) fd.type = mapType(vt, ver); }
+  }
   out.field = fd;
-  if(c != null && fd && DT[fd.type]) out.comp = splitDef(DT[fd.type][c-1]);
-  if(s != null && out.comp && DT[out.comp.type]) out.sub = splitDef(DT[out.comp.type][s-1]);
+  if(c != null && fd && DT[fd.type]){ out.comp = splitDef(DT[fd.type][c-1]); if(out.comp) out.comp.type = mapType(out.comp.type, ver); }
+  if(s != null && out.comp && DT[out.comp.type]){ out.sub = splitDef(DT[out.comp.type][s-1]); if(out.sub) out.sub.type = mapType(out.sub.type, ver); }
   return out;
 }
 function leafType(d, c, s){
-  let t = null;
-  if(s != null && d.sub) t = d.sub.type;
-  else if(c != null && d.comp) t = d.comp.type;
-  else if(c == null && d.field) t = d.field.type;
-  if(t && DT[t] && ((c == null) || (s == null && c != null))) { const first = splitDef(DT[t][0]); if(first) t = DT[first.type] ? splitDef(DT[first.type][0]).type : first.type; }
-  return t;
+  let ty = null;
+  if(s != null && d.sub) ty = d.sub.type;
+  else if(c != null && d.comp) ty = d.comp.type;
+  else if(c == null && d.field) ty = d.field.type;
+  if(ty && DT[ty] && (c == null || s == null)){ const first = splitDef(DT[ty][0]); if(first) ty = DT[first.type] ? splitDef(DT[first.type][0]).type : first.type; }
+  return ty;
 }
 function shortName(seg, f, c, s){
   const d = describe(seg, f, c, s);
-  const parts = [];
-  parts.push(d.field ? d.field.name : (seg.name[0]==='Z' ? 'Z-Feld' : 'Feld '+f));
-  if(c != null) parts.push(d.comp ? d.comp.name : 'Komponente '+c);
-  if(s != null) parts.push(d.sub ? d.sub.name : 'Subkomponente '+s);
+  const parts = [d.field ? d.field.name : (seg.name[0] === 'Z' ? t('zfield') : t('field_n', f))];
+  if(c != null) parts.push(d.comp ? d.comp.name : t('comp_n', c));
+  if(s != null) parts.push(d.sub ? d.sub.name : t('sub_n', s));
   return parts.join(' › ');
 }
-
-/* Pfad-Formatierung */
-function fmtPath(segLabel, f, r, c, s){
-  let p = segLabel + settings.notation + f;
+function fmtPath(segLbl, f, r, c, s){
+  let p = segLbl + settings.notation + f;
   if(r != null) p += '[' + r + ']';
   if(c != null) p += '.' + c;
   if(s != null) p += '.' + s;
   return p;
 }
 function segLabel(seg, withOcc){ return seg.name + (withOcc && seg.multi ? '[' + seg.occ + ']' : ''); }
-
-/* Bestimmt, wie tief der Pfad für ein Blatt angezeigt wird (struktur-basiert) */
 function leafSel(segs, f, r, c, s){
   let incS = false, incC = false, multiRep = false;
   for(const seg of segs){
@@ -603,29 +838,92 @@ function leafSel(segs, f, r, c, s){
   }
   if(incS) incC = true;
   if(c > 1) incC = true;
-  if(s > 1) { incS = true; incC = true; }
+  if(s > 1){ incS = true; incC = true; }
   return { f, r, c: incC ? c : null, s: incS ? s : null, showRep: multiRep || r > 1 };
 }
-
 function tableLookup(seg, f, c, v){
   const key = seg.name + '-' + f;
-  const t = TABLE_MAP[key + '.' + (c || 1)] || ((c == null || c === 1) ? TABLE_MAP[key] : null);
-  if(!t || !TABLES[t]) return null;
-  const hit = TABLES[t][v.trim()];
-  return hit ? { table: t, text: hit } : { table: t, text: null };
+  const id = TABLE_MAP[key + '.' + (c || 1)] || ((c == null || c === 1) ? TABLE_MAP[key] : null);
+  if(!id) return null;
+  const reg = regionOf(seg.msg).code;
+  const regTab = reg && TABLES_REGION[reg] && TABLES_REGION[reg][id];
+  const tab = regTab || TABLES[id]; if(!tab) return null;
+  const src = regTab ? 'HL7 Austria' : TABLE_SRC[id];
+  const hit = tab[v.trim()];
+  return { table: id, src, text: hit ? L(hit) : null };
+}
+
+/* National identifiers */
+function idParts(seg, f, r, type){
+  const g = (c, s) => getVal(seg, f, r, c, s);
+  switch(type){
+    case 'CX':  return { id:g(1,null), ns:g(4,1), uid:g(4,2), code:g(5,null) };
+    case 'XCN': return { id:g(1,null), ns:g(9,1), uid:g(9,2), code:g(13,null) };
+    case 'CN':  return { id:g(1,null), ns:g(9,1), uid:g(9,2), code:'' };
+    case 'CNN': return { id:g(1,null), ns:g(9,null), uid:g(10,null), code:'' };
+    case 'XON': { const id10 = g(10,null); return { id: id10 || g(3,null), ns:g(6,1), uid:g(6,2), code:g(7,null) }; }
+    case 'EI':  return { id:g(1,null), ns:g(2,null), uid:g(3,null), code:'' };
+    default:    return { id:getVal(seg, f, r, null, null), ns:'', uid:'', code:'' };
+  }
+}
+function identifyId(seg, f, r){
+  if(seg.invalid || !seg.fields[f]) return null;
+  const d = describe(seg, f, null, null); const type = d.field ? d.field.type : null;
+  const isId = ID_FIELD_TYPES.has(type), isPlain = PLAIN_ID_FIELDS.has(seg.name + '-' + f);
+  if(!isId && !isPlain) return null;
+  const p = idParts(seg, f, r, isId ? type : 'plain');
+  const val = (p.id || '').trim(); if(!val) return null;
+  const region = regionOf(seg.msg).code;
+  let kind = null, via = null, viaArg = '';
+  for(const x of [p.uid, p.ns]){ const o = (x || '').replace(/^urn:oid:/i, '').trim(); if(ID_OID[o]){ kind = ID_OID[o]; via = 'oid'; viaArg = o; break; } }
+  if(!kind){
+    for(const x of [p.code, p.ns]){
+      const k = (x || '').trim().toUpperCase();
+      const hit = ID_CODE[k] || (region === 'AT' && k === 'SVNR' ? 'svnr' : null);
+      if(hit){ kind = hit; via = 'code'; viaArg = x.trim(); break; }
+    }
+  }
+  const clean = val.replace(/[\s.]/g, '');
+  if(!kind){
+    if(/^[A-Z]\d{9}$/.test(clean) && chkKVNR(clean).ok) kind = 'kvnr';
+    else if(/^756\d{10}$/.test(clean) && chkEAN13(clean).ok) kind = 'ahv';
+    else if(region === 'AT' && /^\d{10}$/.test(clean) && chkSVNR(clean).ok) kind = 'svnr';
+    else if(region === 'DE' && seg.name === 'IN1' && f === 3 && chkIK(clean).ok) kind = 'ik';
+    if(kind) via = 'fmt';
+  }
+  if(!kind) return null;
+  const sys = IDSYS[kind];
+  return { kind, via, viaArg, value: val, res: sys.chk ? sys.chk(clean) : null };
+}
+function idResultText(res){
+  if(!res) return '';
+  if(res.fmt === false) return `<span class="nok">${esc(t('id_format'))}</span>`;
+  if(res.fmtOnly) return `<span class="ok">${esc(t('id_fmt_ok'))}</span>`;
+  return res.ok ? `<span class="ok">${esc(t('id_valid'))}</span>` : `<span class="nok">${esc(t('id_invalid', res.exp))}</span>`;
+}
+function scanIds(msg){
+  const out = [];
+  msg.segs.forEach((seg, si) => {
+    if(seg.invalid) return;
+    for(let f = 1; f < seg.fields.length; f++){
+      const fd = seg.fields[f]; if(!fd || fd.special) continue;
+      fd.reps.forEach((_, ri) => { const id = identifyId(seg, f, ri + 1); if(id && id.res && !id.res.fmtOnly) out.push({ si, f, r: ri + 1, seg, id, multiRep: fd.reps.length > 1 }); });
+    }
+  });
+  return out;
 }
 
 /* =====================================================================
-   Rendering einer Segmentzeile (gemeinsam für Analyse & Vergleich)
+   Segment line rendering (shared by Analyze & Compare)
    ===================================================================== */
 function segHTML(seg, si, side, enc, diff, fieldNums){
-  if(seg.invalid) return `<span class="bad" title="Keine gültige Segmentzeile">${esc(seg.line)}</span>`;
+  if(seg.invalid) return `<span class="bad" title="${esc(t('invalid_line'))}">${esc(seg.line)}</span>`;
   const hdr = HEADER.has(seg.name);
   const sp = ch => `<span class="sp">${esc(ch)}</span>`;
   const fnum = f => fieldNums ? `<span class="fnum">${f}</span>` : '';
   const leaf = (f, r, c, s, v, cls) => {
-    const d = diff && diff.has(f+':'+r+':'+c+':'+s);
-    const txt = v.length > LONG ? esc(v.slice(0, LONG)) + `<span class="more">…[+${v.length - LONG} Zeichen]</span>` : esc(v);
+    const d = diff && diff.has(f + ':' + r + ':' + c + ':' + s);
+    const txt = v.length > LONG ? esc(v.slice(0, LONG)) + `<span class="more">${esc(t('more_chars', v.length - LONG))}</span>` : esc(v);
     return `<span class="lf${v === '' ? ' em' : ''}${d ? ' df' : ''}${cls ? ' ' + cls : ''}" data-k="${side}:${si}:${f}:${r}:${c}:${s}">${txt}</span>`;
   };
   let h = `<span class="sg${seg.name[0] === 'Z' ? ' z' : ''}" data-sg="${side}:${si}">${seg.name}</span>`;
@@ -633,22 +931,25 @@ function segHTML(seg, si, side, enc, diff, fieldNums){
     const fd = seg.fields[f]; if(!fd) continue;
     if(hdr && f === 1){ h += fnum(1) + `<span class="fd" data-f="${side}:${si}:1">${leaf(1,1,1,1,enc.f,'fs')}</span>`; continue; }
     if(!(hdr && f === 2)) h += sp(enc.f);
-    h += fnum(f) + `<span class="fd" data-f="${side}:${si}:${f}">`;
-    if(fd.special) h += leaf(f,1,1,1,fd.raw,'enc');
+    h += (fd.raw !== '' ? fnum(f) : '') + `<span class="fd" data-f="${side}:${si}:${f}">`;
+    if(fd.special) h += leaf(f, 1, 1, 1, fd.raw, 'enc');
     else h += fd.reps.map((rp, ri) => rp.comps.map((cp, ci) => cp.subs.map((sv, xi) => leaf(f, ri+1, ci+1, xi+1, sv)).join(sp(enc.s))).join(sp(enc.c))).join(sp(enc.r));
     h += '</span>';
   }
-  // Diff-Markierung für Felder, die nur auf der anderen Seite existieren
-  if(diff && diff.extra){
-    for(const k of diff.extra){ h += sp(enc.f) + `<span class="lf df em" data-k="${side}:${si}:${k}"></span>`; }
-  }
+  if(diff && diff.extra) for(const k of diff.extra) h += sp(enc.f) + `<span class="lf df em" data-k="${side}:${si}:${k}"></span>`;
   return h;
 }
 
 /* =====================================================================
-   ANALYSE
+   ANALYZE
    ===================================================================== */
-const state = { msgs:[], msgIdx:0, msg:null, sel:null, view:'raw', cmp:null, cmpSel:null };
+const state = { msgs:[], msgIdx:0, msg:null, sel:null, view:'raw', cmp:null, cmpSel:null, cmpEntries:[] };
+
+function renderVersionSelects(){
+  const det = state.msg ? (detectedVersion(state.msg) || '–') : '';
+  const opts = `<option value="auto">${esc(t('ver_auto'))}${det ? ' (' + esc(det) + ')' : ''}</option>` + VERSIONS.map(v => `<option value="${v}">${v}</option>`).join('');
+  $$('.verSel').forEach(sel => { sel.innerHTML = opts; sel.value = settings.version; });
+}
 
 function analyze(){
   const text = $('#inA').value;
@@ -656,62 +957,72 @@ function analyze(){
   if(state.msgIdx >= state.msgs.length) state.msgIdx = 0;
   state.msg = state.msgs[state.msgIdx] || null;
   state.sel = null;
+  renderMsgSelect();
+  renderAnalyze();
+}
+function renderMsgSelect(){
   const sel = $('#msgSel');
   if(state.msgs.length > 1){
     sel.classList.remove('hidden');
-    sel.innerHTML = state.msgs.map((m, i) => {
-      const msh = m.segs.find(s => s.name === 'MSH');
-      const t = msh ? getVal(msh,9,1,null,null) : '';
-      return `<option value="${i}"${i === state.msgIdx ? ' selected' : ''}>Nachricht ${i+1}/${state.msgs.length}: ${esc(t)}</option>`;
-    }).join('');
+    sel.innerHTML = state.msgs.map((m, i) => { const msh = mshOf(m); return `<option value="${i}"${i === state.msgIdx ? ' selected' : ''}>${esc(t('msg_n', i + 1, state.msgs.length))}: ${esc(msh ? getVal(msh, 9, null, null, null) : '')}</option>`; }).join('');
   } else sel.classList.add('hidden');
-  renderAnalyze();
 }
-
-function renderAnalyze(){
-  renderChips();
-  renderRaw();
-  renderList();
-  runQuery();
-  renderInspector();
-}
+function renderAnalyze(){ renderVersionSelects(); renderChips(); renderRaw(); renderList(); runQuery(); renderInspector(); }
 
 function chip(label, val, note, cls){
   if(val === '' || val == null) return '';
   return `<div class="chip${cls ? ' ' + cls : ''}"><b>${esc(label)}</b><span>${esc(val)}</span>${note ? `<small>${esc(note)}</small>` : ''}</div>`;
 }
+function versionChip(msg){
+  const det = detectedVersion(msg);
+  if(settings.version !== 'auto') return chip(t('c_version'), settings.version, t('ver_manual') + (det && det !== settings.version ? ' · ' + t('ver_differs', det) : ''), det && det !== settings.version ? 'warn' : '');
+  if(!det) return chip(t('c_version'), '2.5', t('ver_missing'), 'warn');
+  return chip(t('c_version'), det, t('ver_from_msh'));
+}
+function regionChip(msg){
+  const r = regionOf(msg);
+  if(!r.code) return settings.region === 'INT' ? chip(t('c_region'), t('reg_INT'), '') : '';
+  const via = { msh17:t('reg_via_msh17'), msh12:t('reg_via_msh12'), oid:t('reg_via_oid'), manual:t('reg_manual') }[r.via] || '';
+  return chip(t('c_region'), t('reg_' + r.code), via);
+}
 function summaryChips(msg){
   let h = '';
-  const msh = msg.segs.find(s => s.name === 'MSH');
+  const msh = mshOf(msg);
   if(msh){
     const v = (f, c) => getVal(msh, f, 1, c ?? null, null);
-    const code = v(9,1), ev = v(9,2);
-    h += chip('Nachrichtentyp', v(9), [TABLES['0076'][code], TABLES['0003'][ev]].filter(Boolean).join(' – '));
-    h += chip('Version', v(12,1));
-    h += chip('Control-ID', v(10));
-    h += chip('Zeitpunkt', fmtDate(v(7,1)) || v(7,1));
-    h += chip('Sender', [v(3,1), v(4,1)].filter(Boolean).join(' @ '));
-    h += chip('Empfänger', [v(5,1), v(6,1)].filter(Boolean).join(' @ '));
-    h += chip('Verarbeitung', v(11,1), TABLES['0103'][v(11,1)]);
-    h += chip('Zeichensatz', v(18));
+    const m76 = TABLES['0076'][v(9,1)], m03 = TABLES['0003'][v(9,2)];
+    h += chip(t('c_type'), v(9), [m76 && L(m76), m03 && L(m03)].filter(Boolean).join(' – '));
+    h += versionChip(msg);
+    h += regionChip(msg);
+    h += chip(t('c_ctrl'), v(10));
+    h += chip(t('c_time'), fmtDate(v(7,1)) || v(7,1));
+    h += chip(t('c_sender'), [v(3,1), v(4,1)].filter(Boolean).join(' @ '));
+    h += chip(t('c_receiver'), [v(5,1), v(6,1)].filter(Boolean).join(' @ '));
+    const pr = TABLES['0103'][v(11,1)];
+    h += chip(t('c_proc'), v(11,1), pr ? L(pr) : '');
+    h += chip(t('c_charset'), v(18));
   } else {
-    h += chip('Hinweis', 'Kein MSH-Segment', 'Standard-Trennzeichen |^~\\& angenommen', 'warn');
+    h += chip(t('c_note'), t('no_msh'), t('no_msh_n'), 'warn');
+    h += versionChip(msg) + regionChip(msg);
+  }
+  const ids = scanIds(msg);
+  if(ids.length){
+    const bad = ids.filter(x => !x.id.res.ok);
+    if(bad.length) h += chip(t('c_ids'), t('ids_bad', bad.length), bad.map(x => fmtPath(segLabel(x.seg, true), x.f, x.multiRep ? x.r : null, null, null)).join(', '), 'warn');
+    else h += chip(t('c_ids'), t('ids_ok', ids.length), ids.map(x => IDSYS[x.id.kind][settings.lang].replace(/\s*\(.*\)/, '')).filter((v, i, a) => a.indexOf(v) === i).join(', '), 'good');
   }
   const segCounts = Object.entries(msg.counts).map(([k, n]) => n > 1 ? k + '×' + n : k).join(' ');
-  h += chip('Segmente', String(msg.segs.length), segCounts);
-  const bad = msg.segs.filter(s => s.invalid).length;
-  if(bad) h += chip('Warnung', bad + ' ungültige Zeile(n)', 'rot unterstrichen', 'warn');
+  h += chip(t('c_segments'), String(msg.segs.length), segCounts);
+  const badLines = msg.segs.filter(s => s.invalid).length;
+  if(badLines) h += chip(t('c_warn'), t('bad_lines', badLines), t('bad_lines_n'), 'warn');
   return h;
 }
 function renderChips(){ $('#chips').innerHTML = state.msg ? summaryChips(state.msg) : ''; }
 
 function renderRaw(){
   const box = $('#viewRaw'); const msg = state.msg;
-  if(!msg){
-    box.innerHTML = `<div class="empty-state"><b>Noch keine Nachricht</b><br>Füge oben eine HL7-v2-Nachricht ein oder lade ein Beispiel.<br><br>Danach: mit der Maus über ein Feld fahren, um den Namen zu sehen, und klicken, um alle Details zu öffnen.</div>`;
-    return;
-  }
-  box.innerHTML = msg.segs.map((seg, si) => `<div class="ln"><div class="no">${si+1}</div><div class="tx">${segHTML(seg, si, 'x', msg.enc, null, settings.fieldNums)}</div></div>`).join('');
+  if(!msg){ box.innerHTML = `<div class="empty-state"><b>${esc(t('empty_title'))}</b><br>${t('empty_body')}</div>`; return; }
+  box.innerHTML = msg.segs.map((seg, si) => `<div class="ln"><div class="no">${si + 1}</div><div class="tx">${segHTML(seg, si, 'x', msg.enc, null, settings.fieldNums)}</div></div>`).join('');
   applyHighlight();
 }
 
@@ -723,45 +1034,39 @@ function allLeaves(msg){
       const fd = seg.fields[f]; if(!fd) continue;
       fd.reps.forEach((rp, ri) => rp.comps.forEach((cp, ci) => cp.subs.forEach((sv, xi) => {
         if(sv === '') return;
-        const ls = leafSel([seg], f, ri+1, ci+1, xi+1);
-        out.push({ si, seg, f, r: ri+1, c: ls.c, s: ls.s, rc: ci+1, rs: xi+1,
-          path: fmtPath(segLabel(seg, true), f, ls.showRep ? ri+1 : null, ls.c, ls.s),
-          name: shortName(seg, f, ls.c, ls.s), value: sv });
+        const ls = leafSel([seg], f, ri + 1, ci + 1, xi + 1);
+        out.push({ si, seg, f, r: ri + 1, c: ls.c, s: ls.s, path: fmtPath(segLabel(seg, true), f, ls.showRep ? ri + 1 : null, ls.c, ls.s), name: shortName(seg, f, ls.c, ls.s), value: sv });
       })));
     }
   });
   return out;
 }
-
 function renderList(){
   const box = $('#listBody'); const msg = state.msg;
   if(!msg){ box.innerHTML = ''; return; }
   const q = $('#listFilter').value.trim().toLowerCase();
   const rows = allLeaves(msg).filter(x => !q || x.path.toLowerCase().includes(q) || x.name.toLowerCase().includes(q) || x.value.toLowerCase().includes(q));
   const cur = state.sel;
-  box.innerHTML = `<table class="t"><thead><tr><th>Pfad</th><th>Name</th><th>Wert</th></tr></thead><tbody>` +
+  box.innerHTML = `<table class="t"><thead><tr><th>${esc(t('th_path'))}</th><th>${esc(t('th_name'))}</th><th>${esc(t('th_value'))}</th></tr></thead><tbody>` +
     rows.map(x => {
       const isCur = cur && cur.si === x.si && cur.f === x.f && cur.r === x.r && cur.c === x.c && cur.s === x.s;
-      const v = x.value.length > 200 ? x.value.slice(0,200) + '…' : x.value;
+      const v = x.value.length > 200 ? x.value.slice(0, 200) + '…' : x.value;
       return `<tr data-pick="${x.si}:${x.f}:${x.r}:${x.c ?? ''}:${x.s ?? ''}"${isCur ? ' class="cur"' : ''}><td class="p">${esc(x.path)}</td><td>${esc(x.name)}</td><td class="v">${esc(v)}</td></tr>`;
-    }).join('') + `</tbody></table>` + (rows.length ? '' : `<div class="empty-state">Keine Treffer</div>`);
+    }).join('') + `</tbody></table>` + (rows.length ? '' : `<div class="empty-state">${esc(t('no_results'))}</div>`);
 }
 
 function applyHighlight(){
   const root = $('#viewRaw');
   $$('.lf.sel', root).forEach(e => e.classList.remove('sel'));
   $$('.fd.sf', root).forEach(e => e.classList.remove('sf'));
-  const s = state.sel; if(!s) return;
-  const fdEl = root.querySelector(`.fd[data-f="x:${s.si}:${s.f}"]`);
-  if(fdEl) fdEl.classList.add('sf');
+  const s = state.sel; if(!s || s.f == null) return null;
+  const fdEl = root.querySelector(`.fd[data-f="x:${s.si}:${s.f}"]`); if(fdEl) fdEl.classList.add('sf');
   let prefix = `x:${s.si}:${s.f}:`;
   if(s.r != null){ prefix += s.r + ':'; if(s.c != null){ prefix += s.c + ':'; if(s.s != null) prefix += s.s; } }
-  const sel = s.s != null ? `.lf[data-k="${prefix}"]` : `.lf[data-k^="${prefix}"]`;
-  const els = $$(sel, root);
+  const els = $$(s.s != null ? `.lf[data-k="${prefix}"]` : `.lf[data-k^="${prefix}"]`, root);
   els.forEach(e => e.classList.add('sel'));
   return els[0];
 }
-
 function select(sel, scroll){
   state.sel = sel;
   const first = applyHighlight();
@@ -770,108 +1075,101 @@ function select(sel, scroll){
   renderInspector();
 }
 
-/* ---------- Inspector (Analyse) ---------- */
+/* ---------- Inspector (Analyze) ---------- */
 function crumbHTML(seg, f, c, s){
   const d = describe(seg, f, c, s);
-  const tcode = t => t ? `<code title="${esc(DTNAME[t] || '')}">${esc(t)}</code>` : '';
-  let h = `<div class="crumb">`;
-  h += `<div class="lvl"><span class="n">${seg.name}</span><span>${esc(d.segDesc)}</span></div>`;
-  h += `<div class="lvl${c == null ? ' leaf' : ''}"><span class="n">${f}</span><span>${esc(d.field ? d.field.name : 'Feld ' + f + ' (nicht definiert)')} ${tcode(d.field && d.field.type)}</span></div>`;
-  if(c != null) h += `<div class="lvl${s == null ? ' leaf' : ''}"><span class="n">.${c}</span><span>${esc(d.comp ? d.comp.name : 'Komponente ' + c)} ${tcode(d.comp && d.comp.type)}</span></div>`;
-  if(s != null) h += `<div class="lvl leaf"><span class="n">.${s}</span><span>${esc(d.sub ? d.sub.name : 'Subkomponente ' + s)} ${tcode(d.sub && d.sub.type)}</span></div>`;
+  const tcode = ty => ty ? `<code title="${esc(dtName(ty))}">${esc(ty)}</code>` : '';
+  let h = `<div class="crumb"><div class="lvl"><span class="n">${seg.name}</span><span>${esc(d.segDesc)}</span></div>`;
+  h += `<div class="lvl${c == null ? ' leaf' : ''}"><span class="n">${f}</span><span>${esc(d.field ? d.field.name : t('field_undef', f))} ${tcode(d.field && d.field.type)}</span></div>`;
+  if(c != null) h += `<div class="lvl${s == null ? ' leaf' : ''}"><span class="n">.${c}</span><span>${esc(d.comp ? d.comp.name : t('comp_n', c))} ${tcode(d.comp && d.comp.type)}</span></div>`;
+  if(s != null) h += `<div class="lvl leaf"><span class="n">.${s}</span><span>${esc(d.sub ? d.sub.name : t('sub_n', s))} ${tcode(d.sub && d.sub.type)}</span></div>`;
   return h + `</div>`;
 }
-
-function interpretHTML(seg, sel, enc){
+function interpretHTML(seg, sel){
   const d = describe(seg, sel.f, sel.c, sel.s);
   const val = getVal(seg, sel.f, sel.r, sel.c, sel.s);
   const leafv = getVal(seg, sel.f, sel.r || 1, sel.c || 1, sel.s || 1);
   const rows = [];
-  const t = leafType(d, sel.c, sel.s);
-  if(t) rows.push(['Datentyp', t + (DTNAME[t] ? ' – ' + DTNAME[t] : '')]);
-  if(['DTM','DT','TS'].includes(t) && leafv){ const fd = fmtDate(leafv); if(fd) rows.push(['Datum/Zeit', fd]); }
+  const ty = leafType(d, sel.c, sel.s);
+  if(ty) rows.push([t('dtype'), esc(ty + (dtName(ty) ? ' – ' + dtName(ty) : ''))]);
+  if(['DTM','DT','TS'].includes(ty) && leafv){ const fd = fmtDate(leafv); if(fd) rows.push([t('datetime'), esc(fd)]); }
   const tl = tableLookup(seg, sel.f, sel.c, leafv);
-  if(tl && leafv) rows.push(['HL7-Tabelle ' + tl.table, tl.text ? leafv.trim() + ' = ' + tl.text : leafv.trim() + ' (nicht in Standardtabelle)']);
-  rows.push(['Länge', val.length + ' Zeichen']);
-  const fd = seg.fields[sel.f];
-  if(fd && fd.reps.length > 1) rows.push(['Wiederholungen', fd.reps.length + (sel.r ? ' (angezeigt: ' + sel.r + ')' : '')]);
-  rows.push(['Position', 'Zeile ' + (sel.si + 1) + (seg.multi ? ' · ' + seg.name + ' #' + seg.occ + ' von ' + state_counts(seg) : '')]);
-  let h = `<dl class="kv">` + rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('') + `</dl>`;
-  // Eingebettete Datei (ED) herunterladen
-  if(seg.name === 'OBX' && sel.f === 5 && getVal(seg,2,1,1,1).trim() === 'ED'){
-    const r = sel.r || 1;
-    const data = getVal(seg,5,r,5,null);
-    if(data) h += `<div style="margin-top:10px"><button class="btn sm" data-ed="${sel.si}:${r}">Eingebettete Datei herunterladen (${esc((getVal(seg,5,r,2,null) + '/' + getVal(seg,5,r,3,null)).toLowerCase())})</button></div>`;
+  if(tl && leafv) rows.push([t('table', tl.table) + (tl.src ? ' · ' + tl.src : ''), esc(tl.text ? leafv.trim() + ' = ' + tl.text : leafv.trim() + ' (' + t('not_in_table') + ')')]);
+  const id = identifyId(seg, sel.f, sel.r || 1);
+  if(id){
+    const via = id.via === 'oid' ? t('id_via_oid', id.viaArg) : id.via === 'code' ? t('id_via_code', id.viaArg) : t('id_via_fmt');
+    rows.push([t('id_label'), `<span class="sans">${esc(IDSYS[id.kind][settings.lang])}</span><br>${idResultText(id.res)}<br><span style="color:var(--muted)">${esc(via)}</span>`]);
+  }
+  rows.push([t('length'), esc(t('chars', val.length))]);
+  const fdd = seg.fields[sel.f];
+  if(fdd && fdd.reps.length > 1) rows.push([t('reps'), esc(fdd.reps.length + (sel.r ? ' (' + t('shown', sel.r) + ')' : ''))]);
+  rows.push([t('position'), esc(t('line', sel.si + 1) + (seg.multi ? ' · ' + t('occ_of', seg.name, seg.occ, seg.msg.counts[seg.name]) : ''))]);
+  rows.push([t('ver_def'), esc(t('ver_def_v', verOf(seg.msg)))]);
+  let h = `<dl class="kv">` + rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('') + `</dl>`;
+  if(seg.name === 'OBX' && sel.f === 5 && getVal(seg, 2, 1, 1, 1).trim() === 'ED'){
+    const r = sel.r || 1; const data = getVal(seg, 5, r, 5, null);
+    if(data) h += `<div style="margin-top:10px"><button class="btn sm" data-ed="${sel.si}:${r}">${esc(t('download_ed', (getVal(seg,5,r,2,null) + '/' + getVal(seg,5,r,3,null)).toLowerCase()))}</button></div>`;
   }
   return h;
 }
-function state_counts(seg){ const m = state.msg; return m && m.counts[seg.name] || '?'; }
-
 function valueBox(val, enc, cls){
-  if(val === '') return `<pre class="val empty${cls ? ' ' + cls : ''}">(leer)</pre>`;
+  if(val === '') return `<pre class="val empty${cls ? ' ' + cls : ''}">${esc(t('empty'))}</pre>`;
   const dec = decodeEsc(val, enc);
   let h = `<pre class="val${cls ? ' ' + cls : ''}">${esc(val)}</pre>`;
-  if(dec !== val) h += `<div class="hint" style="margin:6px 0 3px">Dekodiert (Escape-Sequenzen):</div><pre class="val${cls ? ' ' + cls : ''}">${esc(dec)}</pre>`;
+  if(dec !== val) h += `<div class="hint" style="margin:6px 0 3px">${esc(t('decoded'))}</div><pre class="val${cls ? ' ' + cls : ''}">${esc(dec)}</pre>`;
   return h;
 }
-
-function breakdownHTML(seg, sel, segsForSel){
+const hideEmptyBox = () => `<label class="chk r"><input type="checkbox" data-hide-empty ${settings.hideEmpty ? 'checked' : ''}> ${esc(t('hide_empty'))}</label>`;
+function breakdownHTML(seg, sel){
   const fd = seg.fields[sel.f]; if(!fd || fd.special) return '';
   const d = describe(seg, sel.f, null, null);
+  const ver = verOf(seg.msg);
   const defs = d.field && DT[d.field.type] || [];
-  const hasComps = fd.reps.some(rp => rp.comps.length > 1) || defs.length;
-  if(!hasComps) return '';
+  if(!fd.reps.some(rp => rp.comps.length > 1) && !defs.length) return '';
   const multi = fd.reps.length > 1;
-  let h = `<div class="ib"><h4>Aufbau ${esc(fmtPath(seg.name, sel.f, null, null, null))} ${d.field ? '<span style="text-transform:none;letter-spacing:0;font-weight:500">' + esc(d.field.type) + '</span>' : ''}<label class="chk r"><input type="checkbox" data-hide-empty ${settings.hideEmpty ? 'checked' : ''}> leere ausblenden</label></h4>`;
-  h += `<table class="t"><tbody>`;
+  let h = `<div class="ib"><h4>${esc(t('structure', fmtPath(seg.name, sel.f, null, null, null)))} ${d.field ? '<span style="text-transform:none;letter-spacing:0;font-weight:500">' + esc(d.field.type) + '</span>' : ''}${hideEmptyBox()}</h4><table class="t"><tbody>`;
   fd.reps.forEach((rp, ri) => {
     const r = ri + 1;
-    if(multi) h += `<tr><td colspan="3" style="font-weight:600;color:var(--muted);font-size:11px;padding-top:8px">WIEDERHOLUNG ${r}</td></tr>`;
+    if(multi) h += `<tr><td colspan="3" style="font-weight:600;color:var(--muted);font-size:11px;padding-top:8px;text-transform:uppercase">${esc(t('repetition', r))}</td></tr>`;
     const n = Math.max(defs.length, rp.comps.length);
     for(let c = 1; c <= n; c++){
       const cp = rp.comps[c-1]; const v = cp ? cp.raw : '';
-      const cd = splitDef(defs[c-1]);
+      const cd = splitDef(defs[c-1]); if(cd) cd.type = mapType(cd.type, ver);
       if(settings.hideEmpty && v === '') continue;
       const isCur = sel.r === r && sel.c === c && sel.s == null;
       const subDefs = cd && DT[cd.type] || [];
-      const subMulti = cp && cp.subs.length > 1;
-      h += `<tr data-pick="${sel.si}:${sel.f}:${r}:${c}:"${isCur ? ' class="cur"' : ''}${v === '' ? ' class="mt"' : ''}><td class="p">${esc(fmtPath(seg.name, sel.f, multi ? r : null, c, null))}</td><td>${esc(cd ? cd.name : '—')} <span class="ty">${esc(cd ? cd.type : '')}</span></td><td class="v">${esc(v.length > 120 ? v.slice(0,120) + '…' : v)}</td></tr>`;
-      if(subMulti){
+      h += `<tr data-pick="${sel.si}:${sel.f}:${r}:${c}:" class="${isCur ? 'cur' : ''}${v === '' ? ' mt' : ''}"><td class="p">${esc(fmtPath(seg.name, sel.f, multi ? r : null, c, null))}</td><td>${esc(cd ? cd.name : '—')} <span class="ty">${esc(cd ? cd.type : '')}</span></td><td class="v">${esc(v.length > 120 ? v.slice(0, 120) + '…' : v)}</td></tr>`;
+      if(cp && cp.subs.length > 1){
         cp.subs.forEach((sv, xi) => {
           const s = xi + 1; if(settings.hideEmpty && sv === '') return;
-          const sd = splitDef(subDefs[xi]);
+          const sdf = splitDef(subDefs[xi]);
           const isCurS = sel.r === r && sel.c === c && sel.s === s;
-          h += `<tr class="sub${isCurS ? ' cur' : ''}${sv === '' ? ' mt' : ''}" data-pick="${sel.si}:${sel.f}:${r}:${c}:${s}"><td class="p">${esc(fmtPath(seg.name, sel.f, multi ? r : null, c, s))}</td><td>${esc(sd ? sd.name : '—')}</td><td class="v">${esc(sv)}</td></tr>`;
+          h += `<tr class="sub${isCurS ? ' cur' : ''}${sv === '' ? ' mt' : ''}" data-pick="${sel.si}:${sel.f}:${r}:${c}:${s}"><td class="p">${esc(fmtPath(seg.name, sel.f, multi ? r : null, c, s))}</td><td>${esc(sdf ? sdf.name : '—')}</td><td class="v">${esc(sv)}</td></tr>`;
         });
       }
     }
   });
   return h + `</tbody></table></div>`;
 }
-
 function segTableHTML(seg, si, curF){
   if(seg.invalid) return '';
-  const sd = SEGS[seg.name];
+  const sd = SEGS[seg.name]; const ver = verOf(seg.msg);
   const n = Math.max(sd ? sd.f.length : 0, seg.fields.length - 1);
-  let h = `<div class="ib"><h4>Segment ${esc(segLabel(seg, true))} – alle Felder<label class="chk r"><input type="checkbox" data-hide-empty ${settings.hideEmpty ? 'checked' : ''}> leere ausblenden</label></h4><table class="t"><tbody>`;
+  let h = `<div class="ib"><h4>${esc(t('seg_all', segLabel(seg, true)))}${hideEmptyBox()}</h4><div class="hint" style="margin:-4px 0 8px">${esc(segDesc(seg.name))}</div><table class="t"><tbody>`;
   for(let f = 1; f <= n; f++){
     const fd = seg.fields[f]; const v = fd ? fd.raw : '';
     if(settings.hideEmpty && v === '' && f !== curF) continue;
     const def = sd && splitDef(sd.f[f-1]);
-    let type = def ? def.type : '';
-    if(seg.name === 'OBX' && f === 5){ const vt = getVal(seg,2,1,1,1).trim(); if(vt) type = vt; }
-    h += `<tr data-pick="${si}:${f}:::"${f === curF ? ' class="cur"' : (v === '' ? ' class="mt"' : '')}><td class="p">${esc(fmtPath(seg.name, f, null, null, null))}</td><td>${esc(def ? def.name : '—')} <span class="ty">${esc(type)}</span></td><td class="v">${esc(v.length > 120 ? v.slice(0,120) + '…' : v)}</td></tr>`;
+    let type = def ? mapType(def.type, ver) : '';
+    if(seg.name === 'OBX' && f === 5){ const vt = getVal(seg, 2, 1, 1, 1).trim(); if(vt) type = mapType(vt, ver); }
+    h += `<tr data-pick="${si}:${f}:::" class="${f === curF ? 'cur' : (v === '' ? 'mt' : '')}"><td class="p">${esc(fmtPath(seg.name, f, null, null, null))}</td><td>${esc(def ? def.name : '—')} <span class="ty">${esc(type)}</span></td><td class="v">${esc(v.length > 120 ? v.slice(0, 120) + '…' : v)}</td></tr>`;
   }
   return h + `</tbody></table></div>`;
 }
-
 function renderInspector(){
   const box = $('#inspBody'); const msg = state.msg; const sel = state.sel;
   if(!msg){ box.innerHTML = ''; return; }
-  if(!sel){
-    box.innerHTML = `<div class="ib"><div class="hint">Klicke in der Nachricht auf einen Wert – hier erscheinen Pfad (z.B. <code>OBX-3.2</code>), Feldname, Datentyp, Interpretation und der komplette Aufbau des Feldes.<br><br>Klick auf einen <b>Segmentnamen</b> zeigt alle Felder des Segments.<br><kbd>Esc</kbd> hebt die Auswahl auf.</div></div>`;
-    return;
-  }
+  if(!sel){ box.innerHTML = `<div class="ib"><div class="hint">${t('insp_hint')}</div></div>`; return; }
   const seg = msg.segs[sel.si];
   if(sel.f == null){ box.innerHTML = segTableHTML(seg, sel.si, null); return; }
   const fd = seg.fields[sel.f];
@@ -879,16 +1177,16 @@ function renderInspector(){
   const path = fmtPath(seg.name, sel.f, showRep ? sel.r : null, sel.c, sel.s);
   const full = fmtPath(segLabel(seg, true), sel.f, showRep ? sel.r : null, sel.c, sel.s);
   const val = getVal(seg, sel.f, sel.r, sel.c, sel.s);
-  let h = `<div class="ib"><div class="path"><div class="big">${esc(path)}</div><button class="btn sm" data-copy="${esc(path)}">Pfad kopieren</button></div>`;
-  if(full !== path) h += `<div class="alt">eindeutig: ${esc(full)}</div>`;
+  let h = `<div class="ib"><div class="path"><div class="big">${esc(path)}</div><button class="btn sm" data-copy="${esc(path)}">${esc(t('copy_path'))}</button></div>`;
+  if(full !== path) h += `<div class="alt">${esc(t('unique'))} ${esc(full)}</div>`;
   h += crumbHTML(seg, sel.f, sel.c, sel.s) + `</div>`;
-  h += `<div class="ib"><h4>Wert<span class="r"><button class="btn sm" data-copyval>Wert kopieren</button></span></h4>${valueBox(val, msg.enc)}${interpretHTML(seg, sel, msg.enc)}</div>`;
+  h += `<div class="ib"><h4>${esc(t('value'))}<span class="r"><button class="btn sm" data-copyval>${esc(t('copy_value'))}</button></span></h4>${valueBox(val, msg.enc)}${interpretHTML(seg, sel)}</div>`;
   h += breakdownHTML(seg, sel);
   h += segTableHTML(seg, sel.si, sel.f);
   box.innerHTML = h;
 }
 
-/* ---------- Pfadsuche ---------- */
+/* ---------- Path search ---------- */
 const QRE = /^\s*([A-Za-z][A-Za-z0-9]{2})\s*(?:\[(\d+)\]|\((\d+)\))?\s*(?:[-.]?\s*(\d+)(?:\[(\d+)\]|\((\d+)\))?(?:\.(\d+))?(?:\.(\d+))?)?\s*$/;
 function parsePath(q){
   const m = QRE.exec(q); if(!m) return null;
@@ -898,9 +1196,9 @@ function parsePath(q){
 function runQuery(){
   const q = $('#query').value.trim(); const box = $('#qres'); const msg = state.msg;
   $$('#viewRaw .lf.hit').forEach(e => e.classList.remove('hit'));
-  if(!q || !msg){ box.innerHTML = q ? '' : `<div class="hint">Notation: <code>SEG[n]-Feld[Wdh].Komp.Sub</code> – Trenner <code>-</code>, <code>.</code> oder keiner.</div>`; return; }
+  if(!q || !msg){ box.innerHTML = q ? '' : `<div class="hint">${t('q_hint')}</div>`; return; }
   const p = parsePath(q);
-  if(!p){ box.innerHTML = `<div class="hint">Unbekanntes Format. Beispiele: <code>PID-5.1</code>, <code>OBX[2]-5</code>, <code>MSH9.2</code></div>`; return; }
+  if(!p){ box.innerHTML = `<div class="hint">${t('q_bad')}</div>`; return; }
   const res = [];
   msg.segs.forEach((seg, si) => {
     if(seg.name !== p.seg || (p.occ && seg.occ !== p.occ)) return;
@@ -908,56 +1206,41 @@ function runQuery(){
     const fd = seg.fields[p.f];
     const reps = p.r != null ? [p.r] : (p.c == null ? [null] : (fd ? fd.reps.map((_, i) => i + 1) : [1]));
     reps.forEach(r => {
-      const showRep = r != null && (fd && fd.reps.length > 1 || r > 1);
+      const showRep = r != null && ((fd && fd.reps.length > 1) || r > 1);
       res.push({ pick:`${si}:${p.f}:${r ?? ''}:${p.c ?? ''}:${p.s ?? ''}`, path: fmtPath(segLabel(seg, true), p.f, showRep ? r : null, p.c, p.s), val: getVal(seg, p.f, r, p.c, p.s) });
       let prefix = `x:${si}:${p.f}:`; if(r != null){ prefix += r + ':'; if(p.c != null){ prefix += p.c + ':'; if(p.s != null) prefix += p.s; } }
       $$(p.s != null && r != null ? `#viewRaw .lf[data-k="${prefix}"]` : `#viewRaw .lf[data-k^="${prefix}"]`).forEach(e => e.classList.add('hit'));
     });
   });
-  if(!res.length){ box.innerHTML = `<div class="hint">Kein Segment <b>${esc(p.seg)}</b>${p.occ ? ' #' + p.occ : ''} in der Nachricht.</div>`; return; }
-  let name = '';
+  if(!res.length){ box.innerHTML = `<div class="hint">${t('q_none', esc(p.seg) + (p.occ ? ' #' + p.occ : ''))}</div>`; return; }
   const firstSeg = msg.segs.find(s => s.name === p.seg);
-  if(firstSeg && p.f != null) name = `<div class="hint" style="margin-bottom:4px">${esc(shortName(firstSeg, p.f, p.c, p.s))}</div>`;
-  box.innerHTML = name + res.slice(0, 200).map(x => `<div data-pick="${x.pick}"><span class="p">${esc(x.path)}</span><span class="v">${x.val === '' ? '<i style="color:var(--faint)">(leer)</i>' : esc(x.val.length > 160 ? x.val.slice(0,160) + '…' : x.val)}</span></div>`).join('');
+  const name = firstSeg && p.f != null ? `<div class="hint" style="margin-bottom:4px">${esc(shortName(firstSeg, p.f, p.c, p.s))}</div>` : `<div class="hint" style="margin-bottom:4px">${esc(segDesc(p.seg))}</div>`;
+  box.innerHTML = name + res.slice(0, 200).map(x => `<div data-pick="${x.pick}"><span class="p">${esc(x.path)}</span><span class="v">${x.val === '' ? `<i style="color:var(--faint)">${esc(t('empty'))}</i>` : esc(x.val.length > 160 ? x.val.slice(0, 160) + '…' : x.val)}</span></div>`).join('');
 }
-
-function parsePick(str){
-  const [si, f, r, c, s] = str.split(':').map(x => x === '' ? null : +x);
-  return { si, f, r, c, s };
-}
-
-/* ---------- JSON-Export ---------- */
+function parsePick(str){ const [si, f, r, c, s] = str.split(':').map(x => x === '' ? null : +x); return { si, f, r, c, s }; }
 function exportJson(){
   if(!state.msg) return;
-  const obj = {};
-  allLeaves(state.msg).forEach(x => { obj[x.path] = x.value; });
-  copy(JSON.stringify(obj, null, 2), Object.keys(obj).length + ' Felder als JSON');
+  const obj = {}; allLeaves(state.msg).forEach(x => { obj[x.path] = x.value; });
+  copy(JSON.stringify(obj, null, 2), t('json_n', Object.keys(obj).length));
 }
 
 /* =====================================================================
-   VERGLEICH
+   COMPARE
    ===================================================================== */
 function parseIgnore(){
-  const set = new Set();
-  if(!settings.ignoreOn) return set;
-  settings.ignore.split(/[,;\s]+/).forEach(t => {
-    const p = parsePath(t); if(!p || p.f == null) return;
-    set.add(p.seg + '-' + p.f + (p.c != null ? '.' + p.c : ''));
-  });
+  const set = new Set(); if(!settings.ignoreOn) return set;
+  settings.ignore.split(/[,;\s]+/).forEach(x => { const p = parsePath(x); if(p && p.f != null) set.add(p.seg + '-' + p.f + (p.c != null ? '.' + p.c : '')); });
   return set;
 }
-
 function fieldSim(a, b){
   const n = Math.max(a.fields.length, b.fields.length) - 1; if(n <= 0) return 1;
-  let eq = 0;
-  for(let f = 1; f <= n; f++){ if((a.fields[f] ? a.fields[f].raw : '') === (b.fields[f] ? b.fields[f].raw : '')) eq++; }
+  let eq = 0; for(let f = 1; f <= n; f++) if((a.fields[f] ? a.fields[f].raw : '') === (b.fields[f] ? b.fields[f].raw : '')) eq++;
   return eq / n;
 }
-
 function alignSegs(A, B){
   const n = A.length, m = B.length;
-  const sim = Array.from({ length: n }, (_, i) => Array.from({ length: m }, (_, j) => A[i].name === B[j].name && !A[i].invalid ? 1 + fieldSim(A[i], B[j]) : -1));
-  const dp = Array.from({ length: n + 1 }, () => new Float64Array(m + 1));
+  const sim = Array.from({ length:n }, (_, i) => Array.from({ length:m }, (_, j) => A[i].name === B[j].name && !A[i].invalid ? 1 + fieldSim(A[i], B[j]) : -1));
+  const dp = Array.from({ length:n + 1 }, () => new Float64Array(m + 1));
   for(let i = n - 1; i >= 0; i--) for(let j = m - 1; j >= 0; j--){
     let best = Math.max(dp[i+1][j], dp[i][j+1]);
     if(sim[i][j] >= 0) best = Math.max(best, sim[i][j] + dp[i+1][j+1]);
@@ -965,17 +1248,15 @@ function alignSegs(A, B){
   }
   const rows = []; let i = 0, j = 0;
   while(i < n || j < m){
-    if(i < n && j < m && sim[i][j] >= 0 && dp[i][j] === sim[i][j] + dp[i+1][j+1]){ rows.push({ ai: i, bi: j }); i++; j++; }
-    else if(i < n && (j >= m || dp[i][j] === dp[i+1][j])){ rows.push({ ai: i, bi: null }); i++; }
-    else { rows.push({ ai: null, bi: j }); j++; }
+    if(i < n && j < m && sim[i][j] >= 0 && dp[i][j] === sim[i][j] + dp[i+1][j+1]){ rows.push({ ai:i, bi:j }); i++; j++; }
+    else if(i < n && (j >= m || dp[i][j] === dp[i+1][j])){ rows.push({ ai:i, bi:null }); i++; }
+    else { rows.push({ ai:null, bi:j }); j++; }
   }
   return rows;
 }
-
 function diffSegs(a, b, ignore){
-  const leaves = new Set(), list = [];
+  const leaves = new Set(), list = [], extraA = [], extraB = [];
   const nf = Math.max(a.fields.length, b.fields.length);
-  const extraA = [], extraB = [];
   for(let f = 1; f < nf; f++){
     if(ignore.has(a.name + '-' + f)) continue;
     const fa = a.fields[f], fb = b.fields[f];
@@ -990,58 +1271,53 @@ function diffSegs(a, b, ignore){
         const ns = Math.max(ca ? ca.subs.length : 0, cb ? cb.subs.length : 0);
         for(let s = 1; s <= ns; s++){
           const va = ca ? (ca.subs[s-1] ?? '') : '', vb = cb ? (cb.subs[s-1] ?? '') : '';
-          if(va !== vb){
-            const key = f + ':' + r + ':' + c + ':' + s;
-            leaves.add(key); list.push({ f, r, c, s, va, vb });
-            if(!fa) extraA.push(key); if(!fb) extraB.push(key);
-          }
+          if(va !== vb){ const key = f + ':' + r + ':' + c + ':' + s; leaves.add(key); list.push({ f, r, c, s, va, vb }); if(!fa) extraA.push(key); if(!fb) extraB.push(key); }
         }
       }
     }
   }
   return { leaves, list, extraA, extraB };
 }
-
 function runCompare(){
   const ta = $('#cmpA').value, tb = $('#cmpB').value;
-  const view = $('#cmpView'), chips = $('#cmpChips');
   state.cmpSel = null;
   if(!ta.trim() || !tb.trim()){
-    state.cmp = null; chips.innerHTML = '';
-    view.innerHTML = `<div class="empty-state"><b>Zwei Nachrichten einfügen</b><br>A links, B rechts – der Vergleich startet automatisch.<br>Segmente werden intelligent zugeordnet (auch bei eingefügten oder fehlenden Segmenten), Unterschiede werden bis auf Komponenten-Ebene markiert.</div>`;
+    state.cmp = null; $('#cmpChips').innerHTML = '';
+    $('#cmpView').innerHTML = `<div class="empty-state"><b>${esc(t('cmp_empty_t'))}</b><br>${t('cmp_empty_b')}</div>`;
     renderCmpInspector(); return;
   }
   const A = splitMessages(ta)[0], B = splitMessages(tb)[0];
   const ignore = parseIgnore();
   const rows = alignSegs(A.segs, B.segs);
   const mapA = {}, mapB = {};
-  let nChanged = 0, nLeaves = 0, onlyA = 0, onlyB = 0;
   rows.forEach((row, i) => {
     if(row.ai != null) mapA[row.ai] = i;
     if(row.bi != null) mapB[row.bi] = i;
-    if(row.ai != null && row.bi != null){
-      row.diff = diffSegs(A.segs[row.ai], B.segs[row.bi], ignore);
-      row.kind = row.diff.list.length ? 'diff' : 'same';
-      if(row.diff.list.length){ nChanged++; nLeaves += row.diff.list.length; }
-    } else if(row.ai != null){ row.kind = 'onlyA'; onlyA++; }
-    else { row.kind = 'onlyB'; onlyB++; }
+    if(row.ai != null && row.bi != null){ row.diff = diffSegs(A.segs[row.ai], B.segs[row.bi], ignore); row.kind = row.diff.list.length ? 'diff' : 'same'; }
+    else row.kind = row.ai != null ? 'onlyA' : 'onlyB';
   });
   state.cmp = { A, B, rows, mapA, mapB, ignore };
-  const identical = !nLeaves && !onlyA && !onlyB;
-  chips.innerHTML =
-    (identical ? chip('Ergebnis', 'Identisch', ignore.size ? 'ignoriert: ' + [...ignore].join(', ') : '') :
-      chip('Unterschiede', String(nLeaves), 'Werte in ' + nChanged + ' Segment(en)', nLeaves ? 'warn' : '')) +
-    (onlyA ? chip('Nur in A', String(onlyA), 'Segment(e)') : '') +
-    (onlyB ? chip('Nur in B', String(onlyB), 'Segment(e)') : '') +
-    chip('Segmente', A.segs.length + ' / ' + B.segs.length, 'A / B') +
-    (() => { const ma = A.segs.find(s => s.name === 'MSH'), mb = B.segs.find(s => s.name === 'MSH'); if(!ma || !mb) return ''; const ta = getVal(ma,9,null,null,null), tb = getVal(mb,9,null,null,null); return chip('Typ', ta === tb ? ta : ta + ' ≠ ' + tb, '', ta === tb ? '' : 'warn'); })();
-  renderCmpView();
-  renderCmpInspector();
+  renderCmpChips(); renderCmpView(); renderCmpInspector();
 }
-
+function renderCmpChips(){
+  const c = state.cmp; if(!c) return;
+  let nChanged = 0, nLeaves = 0, onlyA = 0, onlyB = 0;
+  c.rows.forEach(r => { if(r.kind === 'diff'){ nChanged++; nLeaves += r.diff.list.length; } if(r.kind === 'onlyA') onlyA++; if(r.kind === 'onlyB') onlyB++; });
+  const identical = !nLeaves && !onlyA && !onlyB;
+  const ma = mshOf(c.A), mb = mshOf(c.B);
+  const typA = ma ? getVal(ma, 9, null, null, null) : '', typB = mb ? getVal(mb, 9, null, null, null) : '';
+  const vA = verOf(c.A), vB = verOf(c.B);
+  $('#cmpChips').innerHTML =
+    (identical ? chip(t('c_result'), t('identical'), c.ignore.size ? t('ignored', [...c.ignore].join(', ')) : '', 'good')
+               : chip(t('c_diffs'), String(nLeaves), t('diffs_in', nChanged), nLeaves ? 'warn' : '')) +
+    (onlyA ? chip(t('c_onlyA'), String(onlyA), t('segs_n')) : '') +
+    (onlyB ? chip(t('c_onlyB'), String(onlyB), t('segs_n')) : '') +
+    chip(t('c_version'), vA === vB ? vA : t('ver_mismatch', vA, vB), settings.version === 'auto' ? t('ver_from_msh') : t('ver_manual'), vA === vB ? '' : 'warn') +
+    chip(t('c_segments'), c.A.segs.length + ' / ' + c.B.segs.length, 'A / B') +
+    (typA || typB ? chip(t('c_typ'), typA === typB ? typA : typA + ' ≠ ' + typB, '', typA === typB ? '' : 'warn') : '');
+}
 function renderCmpView(){
-  const c = state.cmp, view = $('#cmpView');
-  if(!c) return;
+  const c = state.cmp, view = $('#cmpView'); if(!c) return;
   view.classList.toggle('only', settings.onlyDiff);
   view.innerHTML = c.rows.map((row, i) => {
     const sa = row.ai != null ? c.A.segs[row.ai] : null, sb = row.bi != null ? c.B.segs[row.bi] : null;
@@ -1051,7 +1327,6 @@ function renderCmpView(){
   }).join('');
   applyCmpHighlight();
 }
-
 function applyCmpHighlight(){
   const view = $('#cmpView');
   $$('.lf.sel', view).forEach(e => e.classList.remove('sel'));
@@ -1069,39 +1344,32 @@ function applyCmpHighlight(){
   });
   return first;
 }
-
 function cmpSelect(sel, scroll){
   state.cmpSel = sel;
   const first = applyCmpHighlight();
-  if(scroll){
-    const rowEl = $(`#cmpView .crow[data-row="${sel.row}"]`);
-    (first || rowEl) && (first || rowEl).scrollIntoView({ block:'center', behavior:'smooth' });
-  }
+  if(scroll){ const el = first || $(`#cmpView .crow[data-row="${sel.row}"]`); if(el) el.scrollIntoView({ block:'center', behavior:'smooth' }); }
   renderCmpInspector();
 }
-
 function diffListEntries(){
   const c = state.cmp; const out = [];
   c.rows.forEach((row, i) => {
     if(row.kind === 'onlyA' || row.kind === 'onlyB'){
       const seg = row.kind === 'onlyA' ? c.A.segs[row.ai] : c.B.segs[row.bi];
-      out.push({ row: i, kind: row.kind, path: segLabel(seg, true), name: SEGS[seg.name] ? SEGS[seg.name].n : '', line: seg.line });
+      out.push({ row:i, kind:row.kind, path: segLabel(seg, true), name: segDesc(seg.name) });
     } else if(row.kind === 'diff'){
       const sa = c.A.segs[row.ai], sb = c.B.segs[row.bi];
       const label = sa.multi || sb.multi ? sa.name + '[' + sa.occ + ']' : sa.name;
       row.diff.list.forEach(d => {
         const ls = leafSel([sa, sb], d.f, d.r, d.c, d.s);
-        out.push({ row: i, kind:'chg', f: d.f, r: d.r, c: ls.c, s: ls.s,
-          path: fmtPath(label, d.f, ls.showRep ? d.r : null, ls.c, ls.s), name: shortName(sa, d.f, ls.c, ls.s), va: d.va, vb: d.vb });
+        out.push({ row:i, kind:'chg', f:d.f, r:d.r, c:ls.c, s:ls.s, path: fmtPath(label, d.f, ls.showRep ? d.r : null, ls.c, ls.s), name: shortName(sa, d.f, ls.c, ls.s), va:d.va, vb:d.vb });
       });
     }
   });
   return out;
 }
-
 function renderCmpInspector(){
   const box = $('#cmpInsp'), c = state.cmp;
-  if(!c){ box.innerHTML = `<div class="ib"><div class="hint">Hier erscheinen die Liste aller Unterschiede und – nach einem Klick – die Werte aus A und B nebeneinander.</div></div>`; return; }
+  if(!c){ box.innerHTML = `<div class="ib"><div class="hint">${esc(t('cmp_insp_hint'))}</div></div>`; state.cmpEntries = []; return; }
   let h = '';
   const s = state.cmpSel;
   if(s){
@@ -1114,55 +1382,71 @@ function renderCmpInspector(){
     const va = sa ? getVal(sa, s.f, s.r, s.c, s.s) : null, vb = sb ? getVal(sb, s.f, s.r, s.c, s.s) : null;
     const ignored = c.ignore.has(seg.name + '-' + s.f) || (s.c != null && c.ignore.has(seg.name + '-' + s.f + '.' + s.c));
     let badge;
-    if(!sa) badge = `<span class="badge add">Segment nur in B</span>`;
-    else if(!sb) badge = `<span class="badge del">Segment nur in A</span>`;
-    else if(va === vb) badge = `<span class="badge same">gleich</span>`;
-    else badge = `<span class="badge chg">geändert${ignored ? ' (ignoriert)' : ''}</span>`;
-    h += `<div class="ib"><div class="path"><div class="big">${esc(path)}</div><button class="btn sm" data-copy="${esc(path)}">Pfad kopieren</button></div>`;
-    if(full !== path) h += `<div class="alt">eindeutig: ${esc(full)}</div>`;
+    if(!sa) badge = `<span class="badge add">${esc(t('seg_onlyB'))}</span>`;
+    else if(!sb) badge = `<span class="badge del">${esc(t('seg_onlyA'))}</span>`;
+    else if(va === vb) badge = `<span class="badge same">${esc(t('same'))}</span>`;
+    else badge = `<span class="badge chg">${esc(ignored ? t('chg_ign') : t('chg'))}</span>`;
+    h += `<div class="ib"><div class="path"><div class="big">${esc(path)}</div><button class="btn sm" data-copy="${esc(path)}">${esc(t('copy_path'))}</button></div>`;
+    if(full !== path) h += `<div class="alt">${esc(t('unique'))} ${esc(full)}</div>`;
     h += `<div style="margin-top:8px">${badge}</div>` + crumbHTML(seg, s.f, s.c, s.s) + `</div>`;
-    h += `<div class="ib"><h4>Werte</h4><div class="vcmp"><div class="tag">A</div><div>${sa ? valueBox(va, c.A.enc, 'a') : '<pre class="val empty">(Segment fehlt)</pre>'}</div><div class="tag">B</div><div>${sb ? valueBox(vb, c.B.enc, 'b') : '<pre class="val empty">(Segment fehlt)</pre>'}</div></div>`;
-    const tA = sa && fmtDate(getVal(sa, s.f, s.r || 1, s.c || 1, s.s || 1)), tB = sb && fmtDate(getVal(sb, s.f, s.r || 1, s.c || 1, s.s || 1));
+    const missing = `<pre class="val empty">${esc(t('seg_missing'))}</pre>`;
+    h += `<div class="ib"><h4>${esc(t('values'))}</h4><div class="vcmp"><div class="tag">A</div><div>${sa ? valueBox(va, c.A.enc, 'a') : missing}</div><div class="tag">B</div><div>${sb ? valueBox(vb, c.B.enc, 'b') : missing}</div></div>`;
+    const dA = sa && fmtDate(getVal(sa, s.f, s.r || 1, s.c || 1, s.s || 1)), dB = sb && fmtDate(getVal(sb, s.f, s.r || 1, s.c || 1, s.s || 1));
     const lt = leafType(describe(seg, s.f, s.c, s.s), s.c, s.s);
-    if(['DTM','DT','TS'].includes(lt) && (tA || tB)) h += `<dl class="kv"><dt>A Datum</dt><dd>${esc(tA || '–')}</dd><dt>B Datum</dt><dd>${esc(tB || '–')}</dd></dl>`;
-    if(s.c != null && sa && sb) h += `<div class="hint" style="margin:10px 0 4px">Gesamtes Feld ${esc(fmtPath(seg.name, s.f, null, null, null))}:</div><div class="vcmp"><div class="tag">A</div><div>${valueBox(getVal(sa, s.f, null, null, null), c.A.enc, 'a')}</div><div class="tag">B</div><div>${valueBox(getVal(sb, s.f, null, null, null), c.B.enc, 'b')}</div></div>`;
+    if(['DTM','DT','TS'].includes(lt) && (dA || dB)) h += `<dl class="kv"><dt>${esc(t('a_date'))}</dt><dd>${esc(dA || '–')}</dd><dt>${esc(t('b_date'))}</dt><dd>${esc(dB || '–')}</dd></dl>`;
+    if(s.c != null && sa && sb) h += `<div class="hint" style="margin:10px 0 4px">${esc(t('whole_field', fmtPath(seg.name, s.f, null, null, null)))}</div><div class="vcmp"><div class="tag">A</div><div>${valueBox(getVal(sa, s.f, null, null, null), c.A.enc, 'a')}</div><div class="tag">B</div><div>${valueBox(getVal(sb, s.f, null, null, null), c.B.enc, 'b')}</div></div>`;
     h += `</div>`;
   }
   const entries = diffListEntries();
-  h += `<div class="ib"><h4>Unterschiede (${entries.length})<span class="r">${entries.length ? '<button class="btn sm" data-copydiff>als Text kopieren</button>' : ''}</span></h4>`;
-  if(!entries.length) h += `<div class="hint">Keine Unterschiede${c.ignore.size ? ' (ignoriert: ' + esc([...c.ignore].join(', ')) + ')' : ''}.</div>`;
+  h += `<div class="ib"><h4>${esc(t('diffs_title', entries.length))}<span class="r">${entries.length ? `<button class="btn sm" data-copydiff>${esc(t('copy_text'))}</button>` : ''}</span></h4>`;
+  if(!entries.length) h += `<div class="hint">${esc(t('no_diffs'))}${c.ignore.size ? ' (' + esc(t('ignored', [...c.ignore].join(', '))) + ')' : ''}.</div>`;
   else {
+    const cut = v => v.length > 80 ? v.slice(0, 80) + '…' : v;
+    const ev = v => v === '' ? `<i>${esc(t('empty'))}</i>` : esc(cut(v));
     h += `<div class="dlist">` + entries.slice(0, 1000).map((e, idx) => {
       const isCur = s && s.row === e.row && e.kind === 'chg' && s.f === e.f && s.r === e.r && s.c === e.c && s.s === e.s;
-      const cut = v => v.length > 80 ? v.slice(0, 80) + '…' : v;
-      if(e.kind === 'chg') return `<div data-dpick="${idx}"${isCur ? ' class="cur"' : ''}><span class="p">${esc(e.path)}</span><span class="nm">${esc(e.name)}</span><span class="vv"><span class="va">${e.va === '' ? '<i>(leer)</i>' : esc(cut(e.va))}</span><span class="arrow">→</span><span class="vb">${e.vb === '' ? '<i>(leer)</i>' : esc(cut(e.vb))}</span></span></div>`;
-      return `<div data-dpick="${idx}"><span class="p">${esc(e.path)}</span><span class="nm"><span class="badge ${e.kind === 'onlyA' ? 'del' : 'add'}">${e.kind === 'onlyA' ? 'nur in A' : 'nur in B'}</span> ${esc(e.name)}</span></div>`;
+      if(e.kind === 'chg') return `<div data-dpick="${idx}"${isCur ? ' class="cur"' : ''}><span class="p">${esc(e.path)}</span><span class="nm">${esc(e.name)}</span><span class="vv"><span class="va">${ev(e.va)}</span><span class="arrow">→</span><span class="vb">${ev(e.vb)}</span></span></div>`;
+      return `<div data-dpick="${idx}"><span class="p">${esc(e.path)}</span><span class="nm"><span class="badge ${e.kind === 'onlyA' ? 'del' : 'add'}">${esc(e.kind === 'onlyA' ? t('only_in_A') : t('only_in_B'))}</span> ${esc(e.name)}</span></div>`;
     }).join('') + `</div>`;
-    if(entries.length > 1000) h += `<div class="hint">… und ${entries.length - 1000} weitere</div>`;
+    if(entries.length > 1000) h += `<div class="hint">${esc(t('more_n', entries.length - 1000))}</div>`;
   }
   h += `</div>`;
   box.innerHTML = h;
   state.cmpEntries = entries;
 }
-
 function diffAsText(){
-  return (state.cmpEntries || []).map(e => e.kind === 'chg' ? `${e.path}\t${e.name}\tA: ${e.va}\tB: ${e.vb}` : `${e.path}\t${e.kind === 'onlyA' ? 'nur in A' : 'nur in B'}`).join('\n');
+  return state.cmpEntries.map(e => e.kind === 'chg' ? `${e.path}\t${e.name}\tA: ${e.va}\tB: ${e.vb}` : `${e.path}\t${e.kind === 'onlyA' ? t('only_in_A') : t('only_in_B')}`).join('\n');
 }
 
 /* =====================================================================
    Events
    ===================================================================== */
-function debounce(fn, ms){ let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+function debounce(fn, ms){ let tm; return (...a) => { clearTimeout(tm); tm = setTimeout(() => fn(...a), ms); }; }
+function rerenderAll(){
+  applyStatic();
+  renderMsgSelect();
+  renderAnalyze();
+  if(state.cmp){ const keep = state.cmpSel; renderCmpChips(); renderCmpView(); state.cmpSel = keep; applyCmpHighlight(); renderCmpInspector(); }
+  else runCompare();
+  renderVersionSelects();
+}
 
-// Tabs
 $$('.tabs button').forEach(b => b.addEventListener('click', () => {
   $$('.tabs button').forEach(x => x.classList.toggle('on', x === b));
   $('#view-analyze').classList.toggle('hidden', b.dataset.tab !== 'analyze');
   $('#view-compare').classList.toggle('hidden', b.dataset.tab !== 'compare');
 }));
-function showTab(t){ $(`.tabs button[data-tab="${t}"]`).click(); }
+function showTab(tab){ $(`.tabs button[data-tab="${tab}"]`).click(); }
 
-// Analyse-Eingabe
+// language & settings
+$$('.lang button').forEach(b => b.addEventListener('click', () => { settings.lang = b.dataset.lang; saveSettings(); rerenderAll(); }));
+$('#gearBtn').addEventListener('click', e => { e.stopPropagation(); $('#pop').classList.toggle('hidden'); $('#gearBtn').classList.toggle('on', !$('#pop').classList.contains('hidden')); });
+document.addEventListener('click', e => { if(!e.target.closest('#pop') && !e.target.closest('#gearBtn')){ $('#pop').classList.add('hidden'); $('#gearBtn').classList.remove('on'); } });
+$('#notation').addEventListener('change', e => { settings.notation = e.target.value; saveSettings(); rerenderAll(); });
+$('#region').addEventListener('change', e => { settings.region = e.target.value; saveSettings(); rerenderAll(); });
+$$('.verSel').forEach(sel => sel.addEventListener('change', e => { settings.version = e.target.value; saveSettings(); rerenderAll(); }));
+
+// analyze input
 $('#inA').addEventListener('input', debounce(() => { state.msgIdx = 0; analyze(); }, 150));
 $$('[data-sample]').forEach(b => b.addEventListener('click', () => { $('#inA').value = SAMPLES[b.dataset.sample].replace(/\r/g, '\n'); state.msgIdx = 0; analyze(); }));
 $('#clearA').addEventListener('click', () => { $('#inA').value = ''; $('#query').value = ''; analyze(); $('#inA').focus(); });
@@ -1181,55 +1465,47 @@ $('#listFilter').addEventListener('input', debounce(renderList, 120));
 $('#query').addEventListener('input', debounce(runQuery, 100));
 $('#query').addEventListener('keydown', e => { if(e.key === 'Enter'){ const first = $('#qres [data-pick]'); if(first) first.click(); } });
 
-// Klick in Nachricht
 $('#viewRaw').addEventListener('click', e => {
   const lf = e.target.closest('.lf');
   if(lf){
     const [, si, f, r, c, s] = lf.dataset.k.split(':'); const seg = state.msg.segs[+si];
     const ls = leafSel([seg], +f, +r, +c, +s);
-    select({ si: +si, f: +f, r: +r, c: ls.c, s: ls.s }, false);
-    return;
+    select({ si:+si, f:+f, r:+r, c:ls.c, s:ls.s }, false); return;
   }
   const sg = e.target.closest('.sg');
-  if(sg){ const si = +sg.dataset.sg.split(':')[1]; select({ si, f: null, r: null, c: null, s: null }, false); }
+  if(sg) select({ si: +sg.dataset.sg.split(':')[1], f:null, r:null, c:null, s:null }, false);
 });
-// Klick in Listen/Tabellen
 document.addEventListener('click', e => {
   const pick = e.target.closest('[data-pick]');
-  if(pick && (pick.closest('#view-analyze'))){
+  if(pick && pick.closest('#view-analyze')){
     const p = parsePick(pick.dataset.pick);
-    if(p.f == null){ select({ si: p.si, f: null, r: null, c: null, s: null }, true); return; }
-    select(p, true); return;
+    select(p.f == null ? { si:p.si, f:null, r:null, c:null, s:null } : p, true); return;
   }
   const cp = e.target.closest('[data-copy]'); if(cp){ copy(cp.dataset.copy, cp.dataset.copy); return; }
-  if(e.target.closest('[data-copyval]')){
-    const s = state.sel; if(s) copy(getVal(state.msg.segs[s.si], s.f, s.r, s.c, s.s), 'Wert'); return;
-  }
-  if(e.target.closest('[data-copydiff]')){ copy(diffAsText(), (state.cmpEntries || []).length + ' Unterschiede'); return; }
+  if(e.target.closest('[data-copyval]')){ const s = state.sel; if(s) copy(getVal(state.msg.segs[s.si], s.f, s.r, s.c, s.s), t('value_lbl')); return; }
+  if(e.target.closest('[data-copydiff]')){ copy(diffAsText(), t('n_diffs', state.cmpEntries.length)); return; }
   const ed = e.target.closest('[data-ed]');
   if(ed){
     const [si, r] = ed.dataset.ed.split(':').map(Number); const seg = state.msg.segs[si];
     try{
-      const raw = decodeEsc(getVal(seg,5,r,5,null), state.msg.enc).replace(/\s+/g, '');
+      const raw = decodeEsc(getVal(seg, 5, r, 5, null), state.msg.enc).replace(/\s+/g, '');
       const bin = atob(raw); const bytes = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      let t1 = getVal(seg,5,r,2,null).toLowerCase(), t2 = getVal(seg,5,r,3,null).toLowerCase();
+      let t1 = getVal(seg, 5, r, 2, null).toLowerCase(), t2 = getVal(seg, 5, r, 3, null).toLowerCase();
       if(t1 === 'ap') t1 = 'application'; if(t1 === 'im') t1 = 'image'; if(t1 === 'tx') t1 = 'text';
       const blob = new Blob([bytes], { type: t1 && t2 ? t1 + '/' + t2 : 'application/octet-stream' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'obx5_anhang' + (t2 ? '.' + t2 : '.bin'); a.click();
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'obx5_attachment' + (t2 ? '.' + t2 : '.bin'); a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    }catch(err){ toast('Daten sind kein gültiges Base64'); }
+    }catch(err){ toast(t('not_b64')); }
   }
 });
-document.addEventListener('change', e => {
-  if(e.target.matches('[data-hide-empty]')){ settings.hideEmpty = e.target.checked; saveSettings(); renderInspector(); }
-});
+document.addEventListener('change', e => { if(e.target.matches('[data-hide-empty]')){ settings.hideEmpty = e.target.checked; saveSettings(); renderInspector(); } });
 document.addEventListener('keydown', e => {
-  if(e.key === 'Escape' && !e.target.matches('textarea,input')){
-    if(!$('#view-analyze').classList.contains('hidden')) select(null); else { state.cmpSel = null; applyCmpHighlight(); renderCmpInspector(); }
-  }
+  if(e.key !== 'Escape' || e.target.matches('textarea,input')) return;
+  if(!$('#pop').classList.contains('hidden')){ $('#pop').classList.add('hidden'); $('#gearBtn').classList.remove('on'); return; }
+  if(!$('#view-analyze').classList.contains('hidden')) select(null); else { state.cmpSel = null; applyCmpHighlight(); renderCmpInspector(); }
 });
 
-// Tooltip
+// tooltip
 const tip = $('#tip');
 function showTip(e, html){ tip.innerHTML = html; tip.style.display = 'block'; moveTip(e); }
 function moveTip(e){
@@ -1251,20 +1527,24 @@ function tipFor(lf){
   const ls = leafSel(segs, +f, +r, +c, +s);
   const path = fmtPath(segLabel(seg, true), +f, ls.showRep ? +r : null, ls.c, ls.s);
   const v = getVal(seg, +f, +r, +c, +s);
-  return `<div class="tp">${esc(path)}</div><div class="tn">${esc(shortName(seg, +f, ls.c, ls.s))}</div>${v ? `<div class="tv">${esc(v.length > 140 ? v.slice(0,140) + '…' : v)}</div>` : ''}`;
+  return `<div class="tp">${esc(path)}</div><div class="tn">${esc(shortName(seg, +f, ls.c, ls.s))}</div>${v ? `<div class="tv">${esc(v.length > 140 ? v.slice(0, 140) + '…' : v)}</div>` : ''}`;
 }
 ['#viewRaw', '#cmpView'].forEach(id => {
   const el = $(id);
-  el.addEventListener('mouseover', e => { const lf = e.target.closest('.lf'); if(lf && lf.dataset.k.split(':').length === 6) showTip(e, tipFor(lf)); else if(e.target.closest('.sg')) { const sg = e.target.closest('.sg'); const nm = sg.textContent; showTip(e, `<div class="tp">${esc(nm)}</div><div class="tn">${esc(SEGS[nm] ? SEGS[nm].n : (nm[0] === 'Z' ? 'Z-Segment (benutzerdefiniert)' : 'unbekanntes Segment'))}</div>`); } });
+  el.addEventListener('mouseover', e => {
+    const lf = e.target.closest('.lf');
+    if(lf && lf.dataset.k.split(':').length === 6) showTip(e, tipFor(lf));
+    else { const sg = e.target.closest('.sg'); if(sg) showTip(e, `<div class="tp">${esc(sg.textContent)}</div><div class="tn">${esc(segDesc(sg.textContent))}</div>`); }
+  });
   el.addEventListener('mousemove', e => { if(tip.style.display === 'block') moveTip(e); });
   el.addEventListener('mouseout', e => { if(!e.relatedTarget || !el.contains(e.relatedTarget) || !(e.relatedTarget.closest('.lf') || e.relatedTarget.closest('.sg'))) tip.style.display = 'none'; });
 });
 
-// Vergleich
+// compare
 const cmpDeb = debounce(runCompare, 200);
 $('#cmpA').addEventListener('input', cmpDeb);
 $('#cmpB').addEventListener('input', cmpDeb);
-$('#cmpSample').addEventListener('click', () => { $('#cmpA').value = SAMPLES.oru.replace(/\r/g, '\n'); $('#cmpB').value = SAMPLES.oruB.replace(/\r/g, '\n'); runCompare(); });
+$('#cmpSample').addEventListener('click', () => { $('#cmpA').value = SAMPLES.oruCH.replace(/\r/g, '\n'); $('#cmpB').value = SAMPLES.oruCH_B.replace(/\r/g, '\n'); runCompare(); });
 $('#cmpSwap').addEventListener('click', () => { const a = $('#cmpA').value; $('#cmpA').value = $('#cmpB').value; $('#cmpB').value = a; runCompare(); });
 $('#cmpClear').addEventListener('click', () => { $('#cmpA').value = ''; $('#cmpB').value = ''; runCompare(); });
 $('#onlyDiff').addEventListener('change', e => { settings.onlyDiff = e.target.checked; saveSettings(); $('#cmpView').classList.toggle('only', settings.onlyDiff); });
@@ -1277,29 +1557,24 @@ $('#cmpView').addEventListener('click', e => {
   const rowIdx = side === 'a' ? cm.mapA[+si] : cm.mapB[+si]; const row = cm.rows[rowIdx];
   const segs = [row.ai != null ? cm.A.segs[row.ai] : null, row.bi != null ? cm.B.segs[row.bi] : null].filter(Boolean);
   const ls = leafSel(segs, +f, +r, +c, +s);
-  cmpSelect({ row: rowIdx, f: +f, r: +r, c: ls.c, s: ls.s }, false);
+  cmpSelect({ row:rowIdx, f:+f, r:+r, c:ls.c, s:ls.s }, false);
 });
 $('#cmpInsp').addEventListener('click', e => {
   const d = e.target.closest('[data-dpick]'); if(!d) return;
   const en = state.cmpEntries[+d.dataset.dpick];
-  if(en.kind === 'chg') cmpSelect({ row: en.row, f: en.f, r: en.r, c: en.c, s: en.s }, true);
-  else { state.cmpSel = null; applyCmpHighlight(); renderCmpInspector(); const el = $(`#cmpView .crow[data-row="${en.row}"]`); el && el.scrollIntoView({ block:'center', behavior:'smooth' }); }
+  if(en.kind === 'chg') cmpSelect({ row:en.row, f:en.f, r:en.r, c:en.c, s:en.s }, true);
+  else { state.cmpSel = null; applyCmpHighlight(); renderCmpInspector(); const el = $(`#cmpView .crow[data-row="${en.row}"]`); if(el) el.scrollIntoView({ block:'center', behavior:'smooth' }); }
 });
 
-// Einstellungen
-$('#notation').addEventListener('change', e => {
-  settings.notation = e.target.value; saveSettings();
-  renderList(); renderInspector(); runQuery();
-  if(state.cmp) renderCmpInspector();
-});
-
-/* Init */
+/* init */
 loadSettings();
 $('#notation').value = settings.notation;
+$('#region').value = settings.region;
 $('#fieldNums').checked = settings.fieldNums;
 $('#onlyDiff').checked = settings.onlyDiff;
 $('#ignoreOn').checked = settings.ignoreOn;
 $('#ignoreList').value = settings.ignore;
+applyStatic();
 analyze();
 runCompare();
 </script>
